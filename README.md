@@ -7,7 +7,7 @@
 
 ## 📋 Descripción
 
-PreciosRegulados.uy es una aplicación web de código abierto que proporciona acceso fácil y visual a los precios regulados en Uruguay. Los datos provienen de fuentes oficiales del gobierno uruguayo a través del [Catálogo de Datos Abiertos](https://catalogodatos.gub.uy).
+PreciosRegulados.uy es una aplicación web de código abierto que proporciona acceso fácil y visual a los precios regulados en Uruguay. Los datos provienen de fuentes oficiales del gobierno uruguayo a través del [Catálogo de Datos Abiertos](https://catalogodatos.gub.uy), URSEA, y otros organismos oficiales.
 
 ### Características principales
 
@@ -17,6 +17,8 @@ PreciosRegulados.uy es una aplicación web de código abierto que proporciona ac
 - 📱 **Diseño responsive** optimizado para móviles
 - 🔄 **Actualización automática** diaria mediante ETL
 - 🔓 **API REST pública** con documentación OpenAPI
+- ⚡ **Servicios públicos** - UTE (electricidad), OSE (agua), Antel (telecomunicaciones)
+- ⛽ **Combustibles** - ANCAP (nafta, gasoil, supergás)
 
 ## 🏗️ Arquitectura
 
@@ -140,11 +142,18 @@ La API REST está documentada con OpenAPI/Swagger. Una vez ejecutando el backend
 
 ### Endpoints principales
 
+**Productos y Precios:**
 - `GET /api/v1/productos` - Lista todos los productos
 - `GET /api/v1/precios/{producto_id}` - Obtiene histórico de precios
 - `GET /api/v1/variacion/{producto_id}` - Calcula variación porcentual
 - `GET /api/v1/comparar` - Compara múltiples productos
 - `GET /api/v1/estadisticas/{producto_id}` - Obtiene estadísticas
+
+**ETL (Extracción de Datos):**
+- `POST /api/v1/etl/run` - Ejecuta ETL de combustibles
+- `POST /api/v1/etl/utilities/run?service={ute|ose|antel}` - Ejecuta ETL de servicios públicos
+- `POST /api/v1/etl/run-all` - Ejecuta todos los ETL
+- `GET /api/v1/etl/status` - Estado de los procesos ETL
 
 ## 🧪 Tests
 
