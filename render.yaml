@@ -34,4 +34,3 @@ services:
         value: https://cuantocuestauruguay.com
       - key: SENTRY_DSN
         sync: false
-    postDeployCommand: alembic upgrade head
