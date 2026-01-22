@@ -4,8 +4,6 @@ import { productosService, preciosService, estadisticasService, variacionService
 import PriceChart from '../components/PriceChart'
 import { ArrowLeft, TrendingUp, TrendingDown, Activity } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
 
 export default function ProductoDetalle() {
   const { id } = useParams<{ id: string }>()
