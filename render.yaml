@@ -9,6 +9,7 @@ services:
     plan: free
     autoDeploy: true
     dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     envVars:
       - key: DATABASE_URL
         fromDatabase:
