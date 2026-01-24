@@ -1,15 +1,18 @@
 databases:
   - name: preciosregulados-db
     plan: free
+    region: ohio  # Adjust if needed: oregon, ohio, singapore, etc
 
 services:
   - type: web
     name: preciosregulados-api
     env: docker
     plan: free
+    region: ohio  # Match database region for best performance
     autoDeploy: true
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
+    healthCheckPath: /api/v1/etl/status
     envVars:
       - key: DATABASE_URL
         fromDatabase:
