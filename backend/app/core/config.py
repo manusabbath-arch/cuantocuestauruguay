@@ -1,16 +1,18 @@
-from typing import List, Any
+from typing import List, Any, Union
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    
     # API Configuration
     PROJECT_NAME: str = "PreciosRegulados.uy"
     API_V1_PREFIX: str = "/api/v1"
     DEBUG: bool = True
     
     # CORS - Parse from comma-separated string or list
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
     
     # Database
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/preciosregulados"
@@ -29,16 +31,11 @@ class Settings(BaseSettings):
     # Frontend
     FRONTEND_URL: str = "http://localhost:3000"
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-    
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def split_cors(cls, v: Any):
-        if isinstance(v, str):
-            return [url.strip() for url in v.split(",") if url.strip()]
-        return v
+    def get_cors_origins(self) -> List[str]:
+        """Parse CORS_ORIGINS from comma-separated string to list"""
+        if isinstance(self.CORS_ORIGINS, str):
+            return [url.strip() for url in self.CORS_ORIGINS.split(",") if url.strip()]
+        return self.CORS_ORIGINS
 
 
 settings = Settings()
