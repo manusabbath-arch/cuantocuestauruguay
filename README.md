@@ -171,20 +171,103 @@ npm test
 
 ## 📦 Deployment
 
-### Backend (Railway.app)
+### Backend (Render.com)
 
-1. Crear nuevo proyecto en Railway
-2. Conectar repositorio de GitHub
-3. Configurar variables de entorno
-4. Railway detectará automáticamente el Dockerfile
+**Prerequisitos:**
+- Cuenta en [render.com](https://render.com) (free tier)
+- Este repositorio con `render.yaml` en la rama `main`
+
+**Pasos:**
+
+1. **Conectar repo a Render:**
+   - Ve a [Dashboard de Render](https://dashboard.render.com)
+   - Click en "+ New" → "Blueprint"
+   - Selecciona tu repositorio GitHub `manusabbath-arch/cuantocuestauruguay`
+   - Elige rama: `main`
+   - Dale un nombre: `preciosregulados-api`
+
+2. **Review y Deploy:**
+   - Render leerá `render.yaml` automáticamente
+   - Mostrará: 1 Web Service + 1 PostgreSQL Database (free)
+   - Click "Deploy Blueprint"
+   - Espera ~5 min a que termine el build
+
+3. **Obtener URL del backend:**
+   - Una vez deployed, irá a servicio → Environment
+   - Copia la URL como: `https://preciosregulados-api.onrender.com` (o la que te asigne)
+
+4. **Verificar estado:**
+   - Backend API Docs: `https://tu-url-render/docs`
+   - Debe mostrar endpoints de la API
+
+**Nota:** Si el build falla, revisa los logs en "Logs" del servicio.
+
+---
 
 ### Frontend (Cloudflare Pages)
 
-1. Conectar repositorio en Cloudflare Pages
-2. Configurar:
+**Prerequisitos:**
+- Cuenta en [Cloudflare](https://dash.cloudflare.com) (free tier)
+- Dominio `cuantocuestauruguay.com` ya apuntando a Cloudflare DNS
+
+**Pasos:**
+
+1. **Crear proyecto en Pages:**
+   - Ve a [Cloudflare Dashboard](https://dash.cloudflare.com)
+   - "Pages" → "+ Create a project"
+   - "Connect to Git" → Selecciona tu repo
+   - Elige rama: `main`
+
+2. **Configurar build:**
    - Build command: `cd frontend && npm install && npm run build`
    - Build output directory: `frontend/dist`
-3. Añadir variables de entorno: `VITE_API_URL`
+   - Root directory: `/` (dejar vacío o `/`)
+   - Click "Save and Deploy"
+
+3. **Agregar variable de entorno:**
+   - Proyecto → Settings → "Environment variables"
+   - Click "+ Add variable"
+   - Variable name: `VITE_API_URL`
+   - Value: `https://preciosregulados-api.onrender.com` (tu URL de Render)
+   - Environments: Production
+   - Click "Save"
+
+4. **Trigger redeploy (para aplicar env var):**
+   - Vuelve a "Deployments"
+   - Click en el último deployment → "Rollback"
+   - O espera al próximo push a `main`
+
+5. **Conectar dominio personalizado:**
+   - Proyecto → Custom domains → "+ Add custom domain"
+   - Añade:
+     - `cuantocuestauruguay.com`
+     - `www.cuantocuestauruguay.com`
+   - Cloudflare auto-configura SSL; espera propagación DNS (24-48h)
+
+6. **Verificar acceso:**
+   - `https://cuantocuestauruguay.com` debe mostrar tu app
+   - API debe funcionar (verifica conexión en DevTools → Network)
+
+---
+
+### Configuración del Dominio (Cloudflare)
+
+**Estado:**
+- ✅ Dominio `cuantocuestauruguay.com` registrado
+- ✅ DNS configurado en Cloudflare
+- ⏳ Esperando propagación global (24-48h)
+
+**Si aún no apunta correctamente:**
+1. Dashboard Cloudflare → Domain → DNS
+2. Verifica que Cloudflare nameservers están activos (consulta con registrador del dominio)
+
+**Después de Pages + Render:**
+1. Cloudflare añade records A/CNAME automáticamente
+2. En Railway/Render, actualiza `CORS_ORIGINS`:
+   ```
+   https://cuantocuestauruguay.com,https://www.cuantocuestauruguay.com
+   ```
+3. Prueba: `curl https://tu-render-api/api/v1/productos`
 
 ## 🤝 Contribuir
 
