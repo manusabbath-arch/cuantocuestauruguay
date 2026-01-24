@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import List
+import os
 
 
 class Settings(BaseSettings):
@@ -8,7 +9,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     DEBUG: bool = True
     
-    # CORS
+    # CORS - Parse from comma-separated string or list
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
     
     # Database
@@ -31,6 +32,15 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+    
+    @classmethod
+    def settings_customise_sources(cls, settings_cls, init_settings, env_settings, dotenv_settings, file_settings):
+        # Convert CORS_ORIGINS from comma-separated string to list
+        if 'CORS_ORIGINS' in env_settings.data:
+            cors_str = env_settings.data['CORS_ORIGINS']
+            if isinstance(cors_str, str):
+                env_settings.data['CORS_ORIGINS'] = [url.strip() for url in cors_str.split(',')]
+        return (init_settings, env_settings, dotenv_settings, file_settings)
 
 
 settings = Settings()

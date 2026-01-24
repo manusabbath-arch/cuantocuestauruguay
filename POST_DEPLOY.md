@@ -45,15 +45,22 @@ Espera ~2-3 min a que termine.
 
 ## ✅ Paso 4: Agregar Env Var en Cloudflare
 
-1. Proyecto → Settings → "Environment variables"
-2. "+ Add variable"
-   - Name: `VITE_API_URL`
-   - Value: `https://preciosregulados-api.onrender.com` (la que obtuviste en Paso 2)
-   - Environment: Production
-3. Click "Save"
+**IMPORTANTE:** En Cloudflare Pages, las env vars deben estar en el ambiente **Production** para que se usen en el build.
 
-4. Vuelve a Deployments → Last deployment → "Rollback" (para forzar redeploy)
-   O espera al próximo push a `main`
+1. Proyecto Cloudflare Pages → Settings → "Environment variables"
+2. "+ Add variable"
+   - **Type:** Text (selecciona "Text" si hay dropdown)
+   - **Variable name:** `VITE_API_URL`
+   - **Value:** `https://preciosregulados-api.onrender.com` (tu URL de Render obtenida en Paso 2)
+   - **Environments:** Click en "Production" (es el selector importante)
+   - Click "Encrypt" o "Save"
+
+3. **Forzar redeploy:**
+   - Vuelve a "Deployments"
+   - Click en el último deployment → "Rollback" para forzar rebuild
+   - O simplemente espera al próximo `git push` a `main`
+
+**Nota:** Sin seleccionar Production, la env var no se usa en el build y el frontend no puede conectar a la API.
 
 ---
 
