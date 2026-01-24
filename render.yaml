@@ -11,8 +11,6 @@ services:
     region: ohio  # Match database region for best performance
     autoDeploy: true
     dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
-    healthCheckPath: /api/v1/etl/status
     envVars:
       - key: DATABASE_URL
         fromDatabase:
