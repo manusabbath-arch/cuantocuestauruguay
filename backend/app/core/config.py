@@ -1,6 +1,6 @@
+from typing import List, Any
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
-from typing import List
-import os
 
 
 class Settings(BaseSettings):
@@ -33,27 +33,12 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = True
     
+    @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls,
-        init_settings,
-        env_settings,
-        dotenv_settings,
-        file_secret_settings,
-    ):
-        # Convert CORS_ORIGINS from comma-separated string to list
-        if "CORS_ORIGINS" in env_settings.data:
-            cors_str = env_settings.data["CORS_ORIGINS"]
-            if isinstance(cors_str, str):
-                env_settings.data["CORS_ORIGINS"] = [url.strip() for url in cors_str.split(",")]
-
-        return (
-            init_settings,
-            env_settings,
-            dotenv_settings,
-            file_secret_settings,
-        )
+    def split_cors(cls, v: Any):
+        if isinstance(v, str):
+            return [url.strip() for url in v.split(",") if url.strip()]
+        return v
 
 
 settings = Settings()
