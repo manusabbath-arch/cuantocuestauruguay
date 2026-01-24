@@ -34,13 +34,26 @@ class Settings(BaseSettings):
         case_sensitive = True
     
     @classmethod
-    def settings_customise_sources(cls, settings_cls, init_settings, env_settings, dotenv_settings, file_settings):
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
         # Convert CORS_ORIGINS from comma-separated string to list
-        if 'CORS_ORIGINS' in env_settings.data:
-            cors_str = env_settings.data['CORS_ORIGINS']
+        if "CORS_ORIGINS" in env_settings.data:
+            cors_str = env_settings.data["CORS_ORIGINS"]
             if isinstance(cors_str, str):
-                env_settings.data['CORS_ORIGINS'] = [url.strip() for url in cors_str.split(',')]
-        return (init_settings, env_settings, dotenv_settings, file_settings)
+                env_settings.data["CORS_ORIGINS"] = [url.strip() for url in cors_str.split(",")]
+
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+        )
 
 
 settings = Settings()
