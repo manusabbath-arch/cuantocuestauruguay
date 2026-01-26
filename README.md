@@ -42,7 +42,7 @@ PreciosRegulados.uy es una aplicación web de código abierto que proporciona ac
          │ API REST
     ┌────▼─────┐
     │  FastAPI │ (Backend)
-    │ (Railway)│
+    │ (Render) │
     └─┬──┬──┬──┘
       │  │  │
       │  │  └──► PostgreSQL
@@ -51,6 +51,30 @@ PreciosRegulados.uy es una aplicación web de código abierto que proporciona ac
       │
       └────────► CKAN API (catalogodatos.gub.uy)
 ```
+
+### Nueva Arquitectura de Backend (Monorepo)
+
+El backend está evolucionando hacia una arquitectura de **paquetes compartidos** para soportar múltiples apps:
+
+```
+backend/
+├── packages/              # 📦 Código compartido (nuevo)
+│   ├── etl_core/         # Base común para ETL
+│   ├── ckan_client/      # Cliente CKAN reutilizable
+│   └── shared_models/    # Modelos compartidos
+└── app/                   # App de Precios Regulados
+    ├── api/              # Endpoints FastAPI
+    ├── models/           # Modelos de DB
+    └── etl/              # ETL jobs
+
+# Próximamente:
+# └── apps/
+#     ├── precios/       # Precios Regulados
+#     ├── transparencia/ # Datos Abiertos
+#     └── gastos/        # Gastos Públicos
+```
+
+📖 Ver [INTEGRACION_BACKEND.md](docs/INTEGRACION_BACKEND.md) para más detalles.
 
 ### Stack Tecnológico
 

@@ -1,5 +1,5 @@
 # 📋 Plan Estratégico de Mejoras - CuantoCuestaUruguay
-## Versión 1.0 | Enero 2026
+## Versión 2.0 | Enero 2025
 
 ---
 
@@ -7,47 +7,83 @@
 
 Este plan estratégico define los objetivos de evolución del proyecto PreciosRegulados.uy, priorizando seguridad, privacidad, experiencia de usuario y sostenibilidad técnica.
 
+**🆕 NUEVO:** Integración gradual hacia ecosistema unificado de transparencia gubernamental.
+
 ### Ejes Estratégicos
-1. **Seguridad** - Protección de infraestructura y datos
-2. **Privacidad** - Cumplimiento normativo y ética de datos
-3. **Funcionalidad** - Ampliar servicios y valor para usuarios
-4. **Rendimiento** - Optimizar experiencia y costos
-5. **Sostenibilidad** - Escalabilidad y mantenibilidad
+1. **Seguridad** ✅ - Protección de infraestructura y datos (Completado P0)
+2. **Privacidad** ✅ - Cumplimiento normativo y ética de datos (Completado P0)
+3. **Arquitectura** 🔄 - Migración a monorepo con packages compartidos (En progreso)
+4. **Funcionalidad** - Ampliar servicios y valor para usuarios
+5. **Rendimiento** - Optimizar experiencia y costos
+6. **Sostenibilidad** - Escalabilidad y mantenibilidad
 
 ---
 
-## 🔴 PRIORIDAD 0: SEGURIDAD CRÍTICA (Implementar AHORA)
+## 🆕 PRIORIDAD 0.5: INTEGRACIÓN BACKEND (En Progreso)
 
-### SEC-001: Configuración de Seguridad en Cloudflare
-**Objetivo:** Proteger el dominio cuantocuestauruguay.com contra ataques comunes
+### ARCH-001: Estructura de Packages Compartidos ✅ COMPLETADO
+**Objetivo:** Crear base reutilizable para múltiples apps de transparencia
+
+**Acciones completadas:**
+- [x] Crear `backend/packages/etl_core/` con clase `ETLBase`
+- [x] Crear `backend/packages/ckan_client/` con cliente CKAN reutilizable
+- [x] Crear `backend/packages/shared_models/` (Transaction, ETLRun)
+- [x] Documentar en `backend/packages/README.md`
+- [x] Crear ejemplo refactorizado: `combustibles_v2.py`
+- [x] Documentar plan de migración en `docs/MIGRACION_ETL.md`
+- [x] Actualizar `docs/INTEGRACION_BACKEND.md`
+
+**Resultado:** Reducción de 43% en líneas de código, logging automático, métricas integradas
+
+📖 Ver: [docs/INTEGRACION_BACKEND.md](docs/INTEGRACION_BACKEND.md)
+
+---
+
+### ARCH-002: Migrar ETL a usar Packages (Próximo)
+**Objetivo:** Refactorizar ETL existentes para usar arquitectura compartida
 
 **Acciones:**
-- [ ] Activar **Cloudflare WAF** (Web Application Firewall)
-  - Reglas OWASP Core Ruleset
-  - Protección contra inyección SQL, XSS, CSRF
-- [ ] Configurar **SSL/TLS en modo "Full (Strict)"**
-  - Validar certificados de origen
-  - Habilitar HSTS (HTTP Strict Transport Security)
-  - Minimum TLS Version: 1.2
-- [ ] Activar **Rate Limiting** para API
-  - 100 requests/min por IP para endpoints públicos
-  - 10 requests/min para endpoints ETL (POST)
-- [ ] Configurar **Bot Fight Mode**
-  - Bloquear bots maliciosos
-  - Desafío JavaScript para bots sospechosos
-- [ ] Habilitar **DDoS Protection** (automático en Free tier)
-- [ ] Configurar **Page Rules**:
-  - `*.cuantocuestauruguay.com/*` → Always Use HTTPS
-  - `cuantocuestauruguay.com/api/*` → Security Level: High
-- [ ] Activar **Firewall Rules**:
-  - Bloquear IPs de países sospechosos (excepto Uruguay/región)
-  - Permitir solo métodos HTTP necesarios (GET, POST, OPTIONS)
+- [ ] Testear `combustibles_v2.py` en staging
+- [ ] Migrar endpoint `/etl/combustibles` a v2
+- [ ] Crear `ute_v2.py`, `ose_v2.py`, `antel_v2.py`
+- [ ] Comparar performance v1 vs v2 (shadow mode)
+- [ ] Deploy gradual a producción
 
-**Resultado esperado:** Reducir superficie de ataque en 95%
+**Timeline:** Sprint 2-4 (2-3 semanas)
+
+📖 Ver: [docs/MIGRACION_ETL.md](docs/MIGRACION_ETL.md)
 
 ---
 
-### SEC-002: Hardening del Backend (Render.com)
+## 🔴 PRIORIDAD 0: SEGURIDAD CRÍTICA ✅ COMPLETADO
+
+### SEC-001: Configuración de Seguridad en Cloudflare ✅
+**Objetivo:** Proteger el dominio cuantocuestauruguay.com contra ataques comunes
+
+**Acciones completadas:**
+- [x] Activar **Cloudflare WAF** (Web Application Firewall)
+  - Reglas OWASP Core Ruleset
+  - Protección contra inyección SQL, XSS, CSRF
+- [x] Configurar **SSL/TLS en modo "Full (Strict)"**
+  - SSL Labs: **Grado A+**
+  - HSTS habilitado y preload submitted
+  - Minimum TLS Version: 1.2
+- [x] Activar **Rate Limiting** para API
+  - 10 requests/10s para endpoints API
+  - 5 requests/10s para endpoints ETL
+- [x] Configurar **Bot Fight Mode**
+- [x] Habilitar **DDoS Protection** + DNSSEC
+- [x] Configurar **Firewall Rules**:
+  - Bloquear métodos HTTP innecesarios
+  - Security headers configurados
+
+**Resultado:** SSL Labs A+, SecurityHeaders.com en progreso a A
+
+📖 Ver: [docs/CLOUDFLARE_SECURITY.md](docs/CLOUDFLARE_SECURITY.md)
+
+---
+
+### SEC-002: Hardening del Backend ✅ COMPLETADO
 **Objetivo:** Asegurar aplicación FastAPI y PostgreSQL
 
 **Acciones:**
