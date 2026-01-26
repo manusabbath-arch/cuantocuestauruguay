@@ -131,21 +131,11 @@ class CombustiblesETL:
     async def load(self, df: pd.DataFrame) -> int:
         """Carga datos a PostgreSQL"""
         loaded_count = 0
-        created_productos = 0
-        skipped_exists = 0
-        errors = 0
 
         try:
-            # Primero, asegurar que los productos prioritarios existen
-            await self._ensure_productos()
+            logger.info(f"Load function called with {len(df)} rows")
 
-            # Log de productos en BD para debugging
-            all_productos = self.db.query(Producto).filter(Producto.categoria == "combustible").all()
-            logger.info(
-                f"Found {len(all_productos)} combustible products in DB: {[p.nombre for p in all_productos]}"
-            )
-
-            # Mapeo de nombres de CKAN a nombres en nuestra BD (solo los prioritarios)
+            # Mapeo de nombres de CKAN
             nombre_map = {
                 "Gasolina Premium 97": "Nafta Premium 97",
                 "Gasolina Super 95": "Nafta Súper 95",
@@ -155,75 +145,57 @@ class CombustiblesETL:
                 "Supergas": "Supergás",
             }
 
-            # Procesar solo productos que están en el mapeo
+            # Filtrar solo productos en el mapeo
             df_filtered = df[df["producto_nombre"].isin(nombre_map.keys())].copy()
-            logger.info(
-                f"Found {len(df_filtered)} records that match priority mapping from {len(df)} total"
-            )
+            logger.info(f"After filtering: {len(df_filtered)} rows match mapping")
 
-            for _, row in df_filtered.iterrows():
+            if len(df_filtered) == 0:
+                logger.warning("No records after filtering")
+                return 0
+
+            # Asegurar que productos existen
+            await self._ensure_productos()
+
+            for idx, row in df_filtered.iterrows():
                 try:
-                    producto_nombre_original = row["producto_nombre"]
-
-                    # Mapear nombre
-                    producto_nombre = nombre_map.get(producto_nombre_original)
-
-                    # Buscar o crear producto
-                    producto = (
-                        self.db.query(Producto)
-                        .filter(Producto.nombre == producto_nombre)
-                        .first()
-                    )
-
-                    if not producto:
-                        # Crear producto si no existe
-                        producto = Producto(
-                            nombre=producto_nombre,
-                            categoria="combustible",
-                            unidad="litro",
-                            activo=True,
-                        )
-                        self.db.add(producto)
-                        self.db.flush()  # Asegura que tiene ID
-                        created_productos += 1
-                        logger.info(f"Created new product: {producto_nombre}")
-
-                    # Verificar si ya existe el precio para esta fecha
+                    producto_original = row["producto_nombre"]
+                    producto_nombre = nombre_map[producto_original]
                     fecha = row["fecha"]
-                    existing = (
-                        self.db.query(Precio)
-                        .filter(
-                            Precio.producto_id == producto.id, Precio.fecha == fecha
-                        )
-                        .first()
-                    )
+                    precio = row["precio"]
 
-                    if not existing:
-                        nuevo_precio = Precio(
-                            producto_id=producto.id,
-                            fecha=fecha,
-                            valor=row["precio"],
-                            fuente="CKAN - catalogodatos.gub.uy",
-                        )
-                        self.db.add(nuevo_precio)
-                        loaded_count += 1
+                    # Buscar producto
+                    producto = self.db.query(Producto).filter(
+                        Producto.nombre == producto_nombre
+                    ).first()
+
+                    if producto:
+                        # Verificar si ya existe
+                        existing = self.db.query(Precio).filter(
+                            (Precio.producto_id == producto.id) &
+                            (Precio.fecha == fecha)
+                        ).first()
+
+                        if not existing:
+                            self.db.add(Precio(
+                                producto_id=producto.id,
+                                fecha=fecha,
+                                valor=precio,
+                                fuente="CKAN"
+                            ))
+                            loaded_count += 1
                     else:
-                        skipped_exists += 1
+                        logger.warning(f"Product not found: {producto_nombre}")
 
                 except Exception as e:
-                    logger.error(f"Error loading row: {e}", exc_info=True)
-                    errors += 1
+                    logger.error(f"Row {idx} error: {e}", exc_info=True)
                     continue
 
             self.db.commit()
-            logger.info(
-                f"Load summary - Loaded: {loaded_count}, Created productos: {created_productos}, "
-                f"Skipped (exists): {skipped_exists}, Errors: {errors}"
-            )
+            logger.info(f"Successfully loaded {loaded_count} records")
             return loaded_count
 
         except Exception as e:
-            logger.error(f"Error loading data: {e}", exc_info=True)
+            logger.error(f"Load error: {e}", exc_info=True)
             self.db.rollback()
             return 0
 
