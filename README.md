@@ -1,7 +1,15 @@
 # PreciosRegulados.uy 🇺🇾
 
 [![CI/CD](https://github.com/manusabbath-arch/cuantocuestauruguay/actions/workflows/ci.yml/badge.svg)](https://github.com/manusabbath-arch/cuantocuestauruguay/actions/workflows/ci.yml)
+[![Security Audit](https://github.com/manusabbath-arch/cuantocuestauruguay/actions/workflows/security-audit.yml/badge.svg)](https://github.com/manusabbath-arch/cuantocuestauruguay/actions/workflows/security-audit.yml)
+[![Smoke Tests](https://github.com/manusabbath-arch/cuantocuestauruguay/actions/workflows/smoke-prod.yml/badge.svg)](https://github.com/manusabbath-arch/cuantocuestauruguay/actions/workflows/smoke-prod.yml)
+[![codecov](https://codecov.io/gh/manusabbath-arch/cuantocuestauruguay/branch/main/graph/badge.svg)](https://codecov.io/gh/manusabbath-arch/cuantocuestauruguay)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![React 18](https://img.shields.io/badge/react-18-61dafb.svg)](https://reactjs.org/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Cloudflare](https://img.shields.io/badge/deployed-cloudflare-orange.svg)](https://cuantocuestauruguay.com)
+[![Live Site](https://img.shields.io/badge/live-cuantocuestauruguay.com-brightgreen.svg)](https://cuantocuestauruguay.com)
 
 > Plataforma web para consultar y comparar precios regulados en Uruguay (combustibles, servicios e índices económicos) con datos oficiales actualizados.
 
@@ -167,6 +175,23 @@ pytest tests/ -v --cov=app
 ```bash
 cd frontend
 npm test
+```
+
+## 🦋 Pre-commit Hooks
+
+Para garantizar calidad de código, instala los pre-commit hooks:
+
+```bash
+./scripts/install-hooks.sh
+```
+
+Esto ejecutará automáticamente antes de cada commit:
+- **Backend**: black (formateo), isort (imports), flake8 (linting)
+- **Frontend**: eslint (auto-fix), tsc (type checking)
+
+**Saltar hooks** (no recomendado):
+```bash
+git commit --no-verify
 ```
 
 ## 📦 Deployment

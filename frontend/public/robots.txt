@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://cuantocuestauruguay.com/sitemap.xml
+
+# Crawl delay (be nice to our free tier servers)
+Crawl-delay: 1
+
+# Block access to API docs in production (optional, remove if you want them indexed)
+# User-agent: *
+# Disallow: /docs
+# Disallow: /redoc
