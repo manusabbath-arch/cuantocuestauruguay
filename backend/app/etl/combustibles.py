@@ -175,6 +175,7 @@ class CombustiblesETL:
 
                     # Solo cargar productos prioritarios
                     if producto_nombre not in productos_prioritarios:
+                        skipped_no_product += 1
                         continue
 
                     # Buscar producto
@@ -220,7 +221,7 @@ class CombustiblesETL:
 
             self.db.commit()
             logger.info(
-                f"Load summary - Loaded: {loaded_count}, Skipped (no product): {skipped_no_product}, "
+                f"Load summary - Loaded: {loaded_count}, Skipped (not prioritario): {skipped_no_product}, "
                 f"Skipped (exists): {skipped_exists}, Errors: {errors}"
             )
             return loaded_count
