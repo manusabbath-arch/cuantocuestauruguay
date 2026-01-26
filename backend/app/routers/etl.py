@@ -111,3 +111,29 @@ async def obtener_estadisticas_bd(db: Session = Depends(get_db)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas: {str(e)}")
+
+
+@router.post("/debug/test-combustibles")
+async def test_combustibles_etl(db: Session = Depends(get_db)):
+    """Endpoint de test para debugging del ETL de combustibles"""
+    try:
+        etl = CombustiblesETL(db)
+        
+        # Extract
+        df = await etl.extract()
+        extract_count = len(df) if df is not None else 0
+        
+        # Transform
+        df_transformed = await etl.transform(df) if df is not None else None
+        transform_count = len(df_transformed) if df_transformed is not None else 0
+        
+        # Load
+        load_count = await etl.load(df_transformed) if df_transformed is not None else 0
+        
+        return {
+            "extract": extract_count,
+            "transform": transform_count,
+            "load": load_count,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Test error: {str(e)}")
