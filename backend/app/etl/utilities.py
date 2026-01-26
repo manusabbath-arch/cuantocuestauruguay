@@ -200,12 +200,20 @@ class UtilitiesETL:
                         self.db.query(Precio).filter(Precio.producto_id == producto.id, Precio.fecha == fecha).first()
                     )
 
-                    if not existing:
-                        nuevo_precio = Precio(
-                            producto_id=producto.id, fecha=fecha, valor=row["valor"], fuente=row.get("fuente", "URSEA")
-                        )
-                        self.db.add(nuevo_precio)
-                        loaded_count += 1
+                    if existing:
+                        logger.info(f"Skipping existing price for {nombre_producto} on {fecha}")
+                        continue
+
+                    nuevo_precio = Precio(
+                        producto_id=producto.id,
+                        fecha=fecha,
+                        valor=row["valor"],
+                        fuente=row.get("fuente", "URSEA"),
+                    )
+                    # Inserción individual para evitar bulk insert masivo
+                    self.db.add(nuevo_precio)
+                    self.db.flush()
+                    loaded_count += 1
 
                 except Exception as e:
                     logger.error(f"Error loading row: {e}")
