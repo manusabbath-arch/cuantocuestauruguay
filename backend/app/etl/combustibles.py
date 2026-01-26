@@ -141,7 +141,9 @@ class CombustiblesETL:
             
             # Log de productos en BD para debugging
             all_productos = self.db.query(Producto).filter(Producto.categoria == "combustible").all()
-            logger.info(f"Found {len(all_productos)} combustible products in DB: {[p.nombre for p.nombre in all_productos]}")
+            logger.info(
+                f"Found {len(all_productos)} combustible products in DB: {[p.nombre for p in all_productos]}"
+            )
 
             # Mapeo de nombres de CKAN a nombres en nuestra BD (solo los prioritarios)
             nombre_map = {
