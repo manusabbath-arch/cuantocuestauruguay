@@ -156,6 +156,8 @@ class CombustiblesETL:
             # Asegurar que productos existen
             await self._ensure_productos()
 
+            nuevos_precios = []
+
             for idx, row in df_filtered.iterrows():
                 try:
                     producto_original = row["producto_nombre"]
@@ -163,32 +165,42 @@ class CombustiblesETL:
                     fecha = row["fecha"]
                     precio = row["precio"]
 
-                    # Buscar producto
-                    producto = self.db.query(Producto).filter(
-                        Producto.nombre == producto_nombre
-                    ).first()
+                    producto = (
+                        self.db.query(Producto)
+                        .filter(Producto.nombre == producto_nombre)
+                        .first()
+                    )
 
-                    if producto:
-                        # Verificar si ya existe
-                        existing = self.db.query(Precio).filter(
-                            (Precio.producto_id == producto.id) &
-                            (Precio.fecha == fecha)
-                        ).first()
-
-                        if not existing:
-                            self.db.add(Precio(
-                                producto_id=producto.id,
-                                fecha=fecha,
-                                valor=precio,
-                                fuente="CKAN"
-                            ))
-                            loaded_count += 1
-                    else:
+                    if not producto:
                         logger.warning(f"Product not found: {producto_nombre}")
+                        continue
 
+                    exists = (
+                        self.db.query(Precio)
+                        .filter(Precio.producto_id == producto.id, Precio.fecha == fecha)
+                        .first()
+                    )
+
+                    if exists:
+                        continue
+
+                    nuevos_precios.append(
+                        Precio(
+                            producto_id=producto.id,
+                            fecha=fecha,
+                            valor=precio,
+                            fuente="CKAN - catalogodatos.gub.uy",
+                        )
+                    )
                 except Exception as e:
                     logger.error(f"Row {idx} error: {e}", exc_info=True)
                     continue
+
+            if nuevos_precios:
+                # Insertar individualmente para evitar INSERT ... VALUES masivo que falla en Render
+                for precio in nuevos_precios:
+                    self.db.add(precio)
+                loaded_count += len(nuevos_precios)
 
             self.db.commit()
             logger.info(f"Successfully loaded {loaded_count} records")
