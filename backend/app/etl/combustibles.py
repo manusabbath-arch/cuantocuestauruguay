@@ -131,6 +131,9 @@ class CombustiblesETL:
     async def load(self, df: pd.DataFrame) -> int:
         """Carga datos a PostgreSQL"""
         loaded_count = 0
+        skipped_no_product = 0
+        skipped_exists = 0
+        errors = 0
 
         try:
             # Primero, asegurar que los productos existen
@@ -149,10 +152,10 @@ class CombustiblesETL:
             # Productos prioritarios para cargar
             productos_prioritarios = {
                 "Nafta Premium 97",
-                "Nafta Súper 95", 
+                "Nafta Súper 95",
                 "Gasoil 50-S",
                 "Gasoil Común",
-                "Supergás"
+                "Supergás",
             }
 
             for _, row in df.iterrows():
@@ -179,6 +182,7 @@ class CombustiblesETL:
                         logger.warning(
                             f"Product not found in DB, skipping: {producto_nombre}"
                         )
+                        skipped_no_product += 1
                         continue
 
                     # Verificar si ya existe el precio para esta fecha
@@ -200,13 +204,19 @@ class CombustiblesETL:
                         )
                         self.db.add(nuevo_precio)
                         loaded_count += 1
+                    else:
+                        skipped_exists += 1
 
                 except Exception as e:
                     logger.error(f"Error loading row: {e}")
+                    errors += 1
                     continue
 
             self.db.commit()
-            logger.info(f"Successfully loaded {loaded_count} new records")
+            logger.info(
+                f"Load summary - Loaded: {loaded_count}, Skipped (no product): {skipped_no_product}, "
+                f"Skipped (exists): {skipped_exists}, Errors: {errors}"
+            )
             return loaded_count
 
         except Exception as e:
