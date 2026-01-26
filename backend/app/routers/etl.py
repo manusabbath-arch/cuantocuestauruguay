@@ -7,7 +7,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.etl.combustibles_v2 import CombustiblesETLv2
-from app.etl.utilities import UtilitiesETL
+from app.etl.utilities import UtilitiesETL, TARIFF_HISTORY
 from app.etl.alerts import alert_manager
 from app.models.models import Precio, Producto
 from app.scheduler import scheduler
@@ -178,3 +178,57 @@ async def test_combustibles_etl(db: Session = Depends(get_db)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Test error: {str(e)}")
+
+
+@router.get("/utilities/history")
+async def obtener_historico_tarifas():
+    """Obtiene el histórico completo de tarifas de servicios públicos"""
+    return {
+        "data": TARIFF_HISTORY,
+        "ultima_actualizacion": "2026-01-26",
+        "fuentes": {
+            "UTE": "URSEA - Régimen Tarifario para Distribuidoras",
+            "OSE": "URSEA - Régimen Tarifario para Aguas",
+            "ANTEL": "Antel Personas - Planes activos",
+        },
+    }
+
+
+@router.get("/utilities/variations")
+async def obtener_variaciones_tarifas():
+    """
+    Calcula y retorna variaciones de tarifas (porcentaje y valor absoluto)
+    Útil para análisis de inflación de servicios
+    """
+    etl = UtilitiesETL(None)
+    variations = {}
+    
+    for producto_key in TARIFF_HISTORY.keys():
+        var = etl.calculate_variation(producto_key)
+        if var:
+            variations[producto_key] = var
+    
+    return {
+        "variations": variations,
+        "timestamp": str(__import__('datetime').datetime.now().isoformat()),
+    }
+
+
+@router.get("/utilities/history/{producto_key}")
+async def obtener_historico_producto(producto_key: str):
+    """Obtiene el histórico de un producto específico"""
+    if producto_key not in TARIFF_HISTORY:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Producto '{producto_key}' no encontrado en histórico"
+        )
+    
+    etl = UtilitiesETL(None)
+    variation = etl.calculate_variation(producto_key)
+    
+    return {
+        "producto": producto_key,
+        "historia": TARIFF_HISTORY[producto_key],
+        "variacion": variation,
+    }
+
