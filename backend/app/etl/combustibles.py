@@ -146,6 +146,7 @@ class CombustiblesETL:
             }
 
             # Filtrar solo productos en el mapeo
+            logger.info(f"Unique product names from source: {df['producto_nombre'].unique().tolist()}")
             df_filtered = df[df["producto_nombre"].isin(nombre_map.keys())].copy()
             logger.info(f"After filtering: {len(df_filtered)} rows match mapping")
 
