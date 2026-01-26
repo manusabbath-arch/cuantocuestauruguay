@@ -3,9 +3,10 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
-from app.etl.combustibles import CombustiblesETL
+from app.etl.combustibles_v2 import CombustiblesETLv2
 from app.etl.utilities import UtilitiesETL
 from app.models.models import Precio, Producto
 from app.scheduler import scheduler
@@ -17,8 +18,9 @@ router = APIRouter(prefix="/api/v1/etl", tags=["etl"])
 async def ejecutar_etl(db: Session = Depends(get_db)):
     """Ejecuta el proceso ETL de combustibles manualmente"""
     try:
-        etl = CombustiblesETL(db)
-        result = await etl.run()
+        etl = CombustiblesETLv2(db)
+        # CombustiblesETLv2 es sincrónico (hereda de ETLBase); usar threadpool
+        result = await run_in_threadpool(etl.run)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error ejecutando ETL: {str(e)}")
@@ -63,8 +65,8 @@ async def ejecutar_todo_etl(db: Session = Depends(get_db)):
         results = {}
 
         # Ejecutar ETL de combustibles
-        combustibles_etl = CombustiblesETL(db)
-        results["combustibles"] = await combustibles_etl.run()
+        combustibles_etl = CombustiblesETLv2(db)
+        results["combustibles"] = await run_in_threadpool(combustibles_etl.run)
 
         # Ejecutar ETL de utilities
         utilities_etl = UtilitiesETL(db)
@@ -137,23 +139,26 @@ async def obtener_estadisticas_bd(db: Session = Depends(get_db)):
 async def test_combustibles_etl(db: Session = Depends(get_db)):
     """Endpoint de test para debugging del ETL de combustibles"""
     try:
-        etl = CombustiblesETL(db)
-        
+        etl = CombustiblesETLv2(db)
+
+        # Versión v2 es sincrónica; ejecutar en threadpool para no bloquear
         # Extract
-        df = await etl.extract()
+        df = await run_in_threadpool(etl.extract)
         extract_count = len(df) if df is not None else 0
-        
+
         # Transform
-        df_transformed = await etl.transform(df) if df is not None else None
+        df_transformed = await run_in_threadpool(etl.transform, df) if df is not None else None
         transform_count = len(df_transformed) if df_transformed is not None else 0
-        
+
         # Load
-        load_count = await etl.load(df_transformed) if df_transformed is not None else 0
-        
+        load_result = await run_in_threadpool(etl.load, df_transformed) if df_transformed is not None else None
+        load_count = len(df_transformed) if df_transformed is not None else 0
+
         return {
             "extract": extract_count,
             "transform": transform_count,
             "load": load_count,
+            "load_result": load_result,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Test error: {str(e)}")

@@ -1,6 +1,7 @@
 """
 Scheduler para ejecutar tareas periódicas de ETL
 """
+import asyncio
 import logging
 from datetime import datetime
 
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.etl.combustibles import CombustiblesETL
+from app.etl.combustibles_v2 import CombustiblesETLv2
 from app.etl.utilities import UtilitiesETL
 
 logger = logging.getLogger(__name__)
@@ -32,8 +33,9 @@ async def run_etl_job():
     try:
         # Ejecutar ETL de Combustibles
         logger.info("Running Combustibles ETL...")
-        combustibles_etl = CombustiblesETL(db)
-        combustibles_result = await combustibles_etl.run()
+        combustibles_etl = CombustiblesETLv2(db)
+        # Ejecutar ETL sincrónico en thread para no bloquear loop async
+        combustibles_result = await asyncio.to_thread(combustibles_etl.run)
         logger.info(f"Combustibles ETL completed: {combustibles_result}")
 
         # Ejecutar ETL de Utilities
