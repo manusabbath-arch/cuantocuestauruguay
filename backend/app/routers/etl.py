@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.etl.combustibles import CombustiblesETL
 from app.etl.utilities import UtilitiesETL
 from app.models.models import Precio, Producto
+from app.scheduler import scheduler
 
 router = APIRouter(prefix="/api/v1/etl", tags=["etl"])
 
@@ -76,13 +77,32 @@ async def ejecutar_todo_etl(db: Session = Depends(get_db)):
 
 @router.get("/status")
 async def obtener_estado():
-    """Obtiene el estado del último proceso ETL"""
-    # TODO: Implementar tracking de ejecuciones ETL
-    return {
-        "message": "ETL status endpoint - to be implemented",
-        "last_run": None,
-        "available_services": ["combustibles", "ute", "ose", "antel"],
-    }
+    """Obtiene el estado del scheduler y próximas ejecuciones programadas"""
+    try:
+        if not scheduler.running:
+            return {
+                "scheduler_running": False,
+                "message": "Scheduler is not running",
+            }
+        
+        jobs = scheduler.get_jobs()
+        jobs_info = []
+        
+        for job in jobs:
+            jobs_info.append({
+                "id": job.id,
+                "name": job.name,
+                "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
+                "trigger": str(job.trigger),
+            })
+        
+        return {
+            "scheduler_running": True,
+            "jobs": jobs_info,
+            "available_services": ["combustibles", "ute", "ose", "antel"],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo estado: {str(e)}")
 
 
 @router.get("/debug/db-stats")

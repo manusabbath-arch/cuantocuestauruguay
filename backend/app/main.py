@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,10 +8,27 @@ from app.core.config import settings
 from app.core.database import Base, engine
 from app.middleware.security import setup_security_middleware
 from app.routers import etl_router, precios_router
+from app.scheduler import start_scheduler, stop_scheduler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Maneja el ciclo de vida de la aplicación"""
+    logger.info("Starting application...")
+    
+    # Iniciar scheduler para tareas periódicas
+    start_scheduler()
+    logger.info("Scheduler started successfully")
+    
+    yield
+    
+    # Detener scheduler al cerrar
+    stop_scheduler()
+    logger.info("Application shutdown complete")
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -22,6 +40,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # Configure CORS
