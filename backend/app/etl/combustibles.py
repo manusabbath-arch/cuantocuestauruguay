@@ -131,14 +131,14 @@ class CombustiblesETL:
     async def load(self, df: pd.DataFrame) -> int:
         """Carga datos a PostgreSQL"""
         loaded_count = 0
-        skipped_no_product = 0
+        created_productos = 0
         skipped_exists = 0
         errors = 0
 
         try:
-            # Primero, asegurar que los productos existen
+            # Primero, asegurar que los productos prioritarios existen
             await self._ensure_productos()
-            
+
             # Log de productos en BD para debugging
             all_productos = self.db.query(Producto).filter(Producto.categoria == "combustible").all()
             logger.info(
@@ -155,30 +155,20 @@ class CombustiblesETL:
                 "Supergas": "Supergás",
             }
 
-            # Productos prioritarios para cargar
-            productos_prioritarios = {
-                "Nafta Premium 97",
-                "Nafta Súper 95",
-                "Gasoil 50-S",
-                "Gasoil Común",
-                "Supergás",
-            }
+            # Procesar solo productos que están en el mapeo
+            df_filtered = df[df["producto_nombre"].isin(nombre_map.keys())].copy()
+            logger.info(
+                f"Found {len(df_filtered)} records that match priority mapping from {len(df)} total"
+            )
 
-            for _, row in df.iterrows():
+            for _, row in df_filtered.iterrows():
                 try:
                     producto_nombre_original = row["producto_nombre"]
 
                     # Mapear nombre
-                    producto_nombre = nombre_map.get(
-                        producto_nombre_original, producto_nombre_original
-                    )
+                    producto_nombre = nombre_map.get(producto_nombre_original)
 
-                    # Solo cargar productos prioritarios
-                    if producto_nombre not in productos_prioritarios:
-                        skipped_no_product += 1
-                        continue
-
-                    # Buscar producto
+                    # Buscar o crear producto
                     producto = (
                         self.db.query(Producto)
                         .filter(Producto.nombre == producto_nombre)
@@ -186,11 +176,17 @@ class CombustiblesETL:
                     )
 
                     if not producto:
-                        logger.warning(
-                            f"Product not found in DB, skipping: {producto_nombre}"
+                        # Crear producto si no existe
+                        producto = Producto(
+                            nombre=producto_nombre,
+                            categoria="combustible",
+                            unidad="litro",
+                            activo=True,
                         )
-                        skipped_no_product += 1
-                        continue
+                        self.db.add(producto)
+                        self.db.flush()  # Asegura que tiene ID
+                        created_productos += 1
+                        logger.info(f"Created new product: {producto_nombre}")
 
                     # Verificar si ya existe el precio para esta fecha
                     fecha = row["fecha"]
@@ -215,19 +211,19 @@ class CombustiblesETL:
                         skipped_exists += 1
 
                 except Exception as e:
-                    logger.error(f"Error loading row: {e}")
+                    logger.error(f"Error loading row: {e}", exc_info=True)
                     errors += 1
                     continue
 
             self.db.commit()
             logger.info(
-                f"Load summary - Loaded: {loaded_count}, Skipped (not prioritario): {skipped_no_product}, "
+                f"Load summary - Loaded: {loaded_count}, Created productos: {created_productos}, "
                 f"Skipped (exists): {skipped_exists}, Errors: {errors}"
             )
             return loaded_count
 
         except Exception as e:
-            logger.error(f"Error loading data: {e}")
+            logger.error(f"Error loading data: {e}", exc_info=True)
             self.db.rollback()
             return 0
 
