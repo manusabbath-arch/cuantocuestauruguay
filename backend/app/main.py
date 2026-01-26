@@ -1,17 +1,15 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 import logging
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.core.config import settings
-from app.core.database import engine, Base
-from app.routers import precios_router, etl_router
+from app.core.database import Base, engine
 from app.middleware.security import setup_security_middleware
+from app.routers import etl_router, precios_router
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Create database tables
@@ -23,7 +21,7 @@ app = FastAPI(
     description="API REST para consulta de precios regulados en Uruguay",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # Configure CORS
@@ -46,12 +44,7 @@ app.include_router(etl_router)
 @app.get("/")
 async def root():
     """Health check endpoint"""
-    return {
-        "message": "PreciosRegulados.uy API",
-        "version": "1.0.0",
-        "status": "running",
-        "docs": "/docs"
-    }
+    return {"message": "PreciosRegulados.uy API", "version": "1.0.0", "status": "running", "docs": "/docs"}
 
 
 @app.get("/health")
@@ -62,9 +55,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG
-    )
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=settings.DEBUG)

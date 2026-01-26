@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
 from datetime import date
 from decimal import Decimal
-from typing import Optional, List
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 
 # Schemas para Producto
@@ -18,7 +19,7 @@ class ProductoCreate(ProductoBase):
 
 class ProductoResponse(ProductoBase):
     id: int
-    
+
     class Config:
         from_attributes = True
 
@@ -38,7 +39,7 @@ class PrecioCreate(PrecioBase):
 class PrecioResponse(PrecioBase):
     id: int
     created_at: Optional[date] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -84,6 +85,6 @@ class AlertaCreate(AlertaBase):
 
 class AlertaResponse(AlertaBase):
     id: int
-    
+
     class Config:
         from_attributes = True
