@@ -64,18 +64,14 @@ class CombustiblesETL:
     async def transform(self, df: pd.DataFrame) -> Optional[pd.DataFrame]:
         """Limpia y transforma datos"""
         try:
-            # Normalizar nombres de columnas
-            df.columns = df.columns.str.lower().str.strip()
+            # Log columnas originales
+            logger.info(f"Original columns: {df.columns.tolist()}")
 
-            # Log columnas disponibles para debug
-            logger.info(f"Available columns: {df.columns.tolist()}")
-
-            # Intentar diferentes formatos de fecha comunes en datasets uruguayos
-            fecha_columns = ["periodo", "fecha", "date", "mes"]
+            # Buscar columna de fecha (respetar mayúsculas/minúsculas)
             fecha_col = None
-
-            for col in fecha_columns:
-                if col in df.columns:
+            for col in df.columns:
+                col_lower = col.lower()
+                if col_lower in ["ano-mes", "año-mes", "periodo", "fecha", "date", "mes"]:
                     fecha_col = col
                     break
 
@@ -83,22 +79,47 @@ class CombustiblesETL:
                 logger.error(f"No date column found. Columns: {df.columns.tolist()}")
                 return None
 
-            # Convertir fechas (intentar múltiples formatos)
-            try:
-                df["fecha"] = pd.to_datetime(df[fecha_col], format="%Y-%m", errors="coerce")
-            except:
-                try:
-                    df["fecha"] = pd.to_datetime(df[fecha_col], errors="coerce")
-                except Exception as e:
-                    logger.error(f"Error parsing dates: {e}")
-                    return None
-
-            # Eliminar filas con fechas inválidas
+            # Convertir fechas (formato YYYY-MM)
+            df["fecha"] = pd.to_datetime(df[fecha_col], format="%Y-%m", errors="coerce")
             df = df.dropna(subset=["fecha"])
             df["fecha"] = df["fecha"].dt.date
 
-            # Transformar formato long (melted) si es necesario
-            # Esto depende de la estructura específica del dataset
+            # Buscar columna de producto
+            producto_col = None
+            for col in df.columns:
+                if col.lower() == "producto":
+                    producto_col = col
+                    break
+
+            if not producto_col:
+                logger.error(f"No producto column found. Columns: {df.columns.tolist()}")
+                return None
+
+            # Buscar columna de precio
+            precio_col = None
+            for col in df.columns:
+                col_lower = col.lower()
+                if "precio" in col_lower or "valor" in col_lower:
+                    precio_col = col
+                    break
+
+            if not precio_col:
+                logger.error(f"No precio column found. Columns: {df.columns.tolist()}")
+                return None
+
+            # Convertir precio (reemplazar coma por punto si es string)
+            if df[precio_col].dtype == "object":
+                df["precio"] = df[precio_col].str.replace(",", ".").astype(float)
+            else:
+                df["precio"] = pd.to_numeric(df[precio_col], errors="coerce")
+
+            df = df.dropna(subset=["precio"])
+
+            # Renombrar columna de producto
+            df["producto_nombre"] = df[producto_col]
+
+            # Mantener solo columnas necesarias
+            df = df[["fecha", "producto_nombre", "precio"]]
 
             logger.info(f"Transformed {len(df)} records")
             return df
@@ -115,33 +136,57 @@ class CombustiblesETL:
             # Primero, asegurar que los productos existen
             await self._ensure_productos()
 
-            # Preparar datos para inserción
-            # Este código necesita adaptarse según la estructura real del dataset
+            # Mapeo de nombres de CKAN a nombres en nuestra BD
+            nombre_map = {
+                "Gasolina Premium 97": "Nafta Premium 97",
+                "Gasolina Super 95": "Nafta Súper 95",
+                "Gasoil 50-S": "Gasoil 50-S",
+                "Gasoil": "Gasoil Común",
+                "Gasoil Comun": "Gasoil Común",
+                "Supergas": "Supergás",
+            }
+
             for _, row in df.iterrows():
                 try:
-                    # Buscar o crear producto (esto es un ejemplo, ajustar según estructura real)
-                    for key, nombre in self.PRODUCTOS_MAP.items():
-                        if key.lower() in str(row).lower():
-                            producto = self.db.query(Producto).filter(Producto.nombre == nombre).first()
+                    producto_nombre_original = row["producto_nombre"]
 
-                            if producto and "fecha" in row and pd.notna(row["fecha"]):
-                                # Verificar si ya existe el precio para esta fecha
-                                existing = (
-                                    self.db.query(Precio)
-                                    .filter(Precio.producto_id == producto.id, Precio.fecha == row["fecha"])
-                                    .first()
-                                )
+                    # Mapear nombre
+                    producto_nombre = nombre_map.get(
+                        producto_nombre_original, producto_nombre_original
+                    )
 
-                                if not existing:
-                                    # Insertar nuevo precio
-                                    nuevo_precio = Precio(
-                                        producto_id=producto.id,
-                                        fecha=row["fecha"],
-                                        valor=row.get("precio", row.get("valor", 0)),
-                                        fuente="CKAN - catalogodatos.gub.uy",
-                                    )
-                                    self.db.add(nuevo_precio)
-                                    loaded_count += 1
+                    # Buscar producto
+                    producto = (
+                        self.db.query(Producto)
+                        .filter(Producto.nombre == producto_nombre)
+                        .first()
+                    )
+
+                    if not producto:
+                        logger.warning(
+                            f"Product not found: {producto_nombre} (original: {producto_nombre_original})"
+                        )
+                        continue
+
+                    # Verificar si ya existe el precio para esta fecha
+                    fecha = row["fecha"]
+                    existing = (
+                        self.db.query(Precio)
+                        .filter(
+                            Precio.producto_id == producto.id, Precio.fecha == fecha
+                        )
+                        .first()
+                    )
+
+                    if not existing:
+                        nuevo_precio = Precio(
+                            producto_id=producto.id,
+                            fecha=fecha,
+                            valor=row["precio"],
+                            fuente="CKAN - catalogodatos.gub.uy",
+                        )
+                        self.db.add(nuevo_precio)
+                        loaded_count += 1
 
                 except Exception as e:
                     logger.error(f"Error loading row: {e}")
