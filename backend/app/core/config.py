@@ -12,8 +12,12 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     DEBUG: bool = True
 
+    # Secrets (definir en .env en producción)
+    SECRET_KEY: str = "CHANGE_ME_IN_ENV"
+
     # CORS - Parse from comma-separated string or list
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    # Valores por defecto apuntan a dominios productivos; sobrescribir en .env para dev
+    CORS_ORIGINS: str = "https://cuantocuestauruguay.com,https://www.cuantocuestauruguay.com"
 
     # Database
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/preciosregulados"
@@ -25,6 +29,10 @@ class Settings(BaseSettings):
     # Scheduler
     ETL_SCHEDULE_HOUR: int = 2
     ETL_SCHEDULE_MINUTE: int = 0
+
+    # Rate limiting
+    RATE_LIMIT_GENERAL: int = 60  # requests/min
+    RATE_LIMIT_ETL: int = 5       # requests/min para /api/v1/etl/*
 
     # Sentry
     SENTRY_DSN: str = ""

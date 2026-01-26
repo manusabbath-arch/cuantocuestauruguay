@@ -40,14 +40,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Force HTTPS (31536000 seconds = 1 year)
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
 
-        # Content Security Policy
+        # Content Security Policy (incluir frontend y API)
         csp_directives = [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # Adjust based on frontend needs
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # Ajustar si frontend endurece CSP
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: https:",
             "font-src 'self' data:",
-            "connect-src 'self' https://preciosregulados-api.onrender.com",
+            "connect-src 'self' https://preciosregulados-api.onrender.com https://cuantocuestauruguay.com https://www.cuantocuestauruguay.com",
             "frame-ancestors 'none'",
             "base-uri 'self'",
             "form-action 'self'",
@@ -69,16 +69,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """
-    Simple in-memory rate limiting middleware
+    """Rate limiting in-memory (per-IP) with separate limits for ETL endpoints"""
 
-    For production, consider using Redis-backed rate limiting
-    or Cloudflare's rate limiting features
-    """
-
-    def __init__(self, app, requests_per_minute: int = 60):
+    def __init__(self, app, requests_per_minute: int = 60, requests_per_minute_etl: int = 5):
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
+        self.requests_per_minute_etl = requests_per_minute_etl
         self.request_counts = {}
         self.window_size = 60  # seconds
 
@@ -100,14 +96,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         ip_requests = self.request_counts[client_ip]
         request_count = sum(count for _, count in ip_requests)
 
+        # Seleccionar límite según path (endpoints ETL más estrictos)
+        limit = self.requests_per_minute_etl if request.url.path.startswith("/api/v1/etl") else self.requests_per_minute
+
         # Check rate limit
-        if request_count >= self.requests_per_minute:
+        if request_count >= limit:
             return Response(
                 content="Rate limit exceeded. Please try again later.",
                 status_code=429,
                 headers={
                     "Retry-After": str(self.window_size),
-                    "X-RateLimit-Limit": str(self.requests_per_minute),
+                    "X-RateLimit-Limit": str(limit),
                     "X-RateLimit-Remaining": "0",
                     "X-RateLimit-Reset": str(int(current_time + self.window_size)),
                 },
@@ -119,8 +118,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         # Add rate limit headers
-        remaining = self.requests_per_minute - request_count - 1
-        response.headers["X-RateLimit-Limit"] = str(self.requests_per_minute)
+        remaining = limit - request_count - 1
+        response.headers["X-RateLimit-Limit"] = str(limit)
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         response.headers["X-RateLimit-Reset"] = str(int(current_time + self.window_size))
 
@@ -138,8 +137,13 @@ def setup_security_middleware(app):
     # Add security headers
     app.add_middleware(SecurityHeadersMiddleware)
 
-    # Add rate limiting (adjust limit based on needs)
-    # Higher limit for production, can be environment variable
-    app.add_middleware(RateLimitMiddleware, requests_per_minute=100)
+    # Add rate limiting (límites configurables desde settings)
+    from app.core.config import settings
+
+    app.add_middleware(
+        RateLimitMiddleware,
+        requests_per_minute=settings.RATE_LIMIT_GENERAL,
+        requests_per_minute_etl=settings.RATE_LIMIT_ETL,
+    )
 
     return app
