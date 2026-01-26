@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.database import get_db
 from app.etl.combustibles_v2 import CombustiblesETLv2
 from app.etl.utilities import UtilitiesETL
+from app.etl.alerts import alert_manager
 from app.models.models import Precio, Producto
 from app.scheduler import scheduler
 
@@ -133,6 +134,21 @@ async def obtener_estadisticas_bd(db: Session = Depends(get_db)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas: {str(e)}")
+
+
+@router.get("/alerts")
+async def obtener_alertas_etl():
+    """Obtiene alertas recientes del sistema de ETL"""
+    try:
+        summary = alert_manager.get_alert_summary()
+        recent = alert_manager.get_recent_alerts(limit=20)
+        
+        return {
+            "summary": summary,
+            "recent_alerts": recent,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo alertas: {str(e)}")
 
 
 @router.post("/debug/test-combustibles")

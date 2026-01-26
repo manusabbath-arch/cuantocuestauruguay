@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.etl.combustibles_v2 import CombustiblesETLv2
 from app.etl.utilities import UtilitiesETL
+from app.etl.alerts import alert_manager
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ async def run_etl_job():
 
     except Exception as e:
         logger.error(f"Error in scheduled ETL job: {e}", exc_info=True)
+        alert_manager.alert_etl_failure("scheduled_etl_all", e, 0)
     finally:
         db.close()
 
