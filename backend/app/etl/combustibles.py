@@ -140,6 +140,7 @@ class CombustiblesETL:
             nombre_map = {
                 "Gasolina Premium 97": "Nafta Premium 97",
                 "Gasolina Super 95": "Nafta Súper 95",
+                "Gasoil 10-S": "Gasoil 50-S",  # Usar 50-S como referencia
                 "Gasoil 50-S": "Gasoil 50-S",
                 "Gasoil": "Gasoil Común",
                 "Gasoil Comun": "Gasoil Común",
