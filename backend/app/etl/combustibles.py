@@ -157,8 +157,6 @@ class CombustiblesETL:
             # Asegurar que productos existen
             await self._ensure_productos()
 
-            nuevos_precios = []
-
             for idx, row in df_filtered.iterrows():
                 try:
                     producto_original = row["producto_nombre"]
@@ -185,23 +183,20 @@ class CombustiblesETL:
                     if exists:
                         continue
 
-                    nuevos_precios.append(
-                        Precio(
-                            producto_id=producto.id,
-                            fecha=fecha,
-                            valor=precio,
-                            fuente="CKAN - catalogodatos.gub.uy",
-                        )
+                    # Insertar individualmente para evitar problemas con bulk insert
+                    precio_obj = Precio(
+                        producto_id=producto.id,
+                        fecha=fecha,
+                        valor=precio,
+                        fuente="CKAN - catalogodatos.gub.uy",
                     )
+                    self.db.add(precio_obj)
+                    self.db.flush()  # Forzar inserción inmediata
+                    loaded_count += 1
+
                 except Exception as e:
                     logger.error(f"Row {idx} error: {e}", exc_info=True)
                     continue
-
-            if nuevos_precios:
-                # Insertar individualmente para evitar INSERT ... VALUES masivo que falla en Render
-                for precio in nuevos_precios:
-                    self.db.add(precio)
-                loaded_count += len(nuevos_precios)
 
             self.db.commit()
             logger.info(f"Successfully loaded {loaded_count} records")
