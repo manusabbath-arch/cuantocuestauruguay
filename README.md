@@ -197,7 +197,7 @@ npm test
    - Copia la URL como: `https://preciosregulados-api.onrender.com` (o la que te asigne)
 
 4. **Verificar estado:**
-   - Backend API Docs: `https://tu-url-render/docs`
+   - Backend API Docs: `https://preciosregulados-api.onrender.com/docs`
    - Debe mostrar endpoints de la API
 
 **Nota:** Si el build falla, revisa los logs en "Logs" del servicio.
@@ -228,7 +228,7 @@ npm test
    - Proyecto → Settings → "Environment variables"
    - Click "+ Add variable"
    - Variable name: `VITE_API_URL`
-   - Value: `https://preciosregulados-api.onrender.com` (tu URL de Render)
+   - Value: `https://preciosregulados-api.onrender.com`
    - Environments: Production
    - Click "Save"
 
@@ -263,11 +263,11 @@ npm test
 
 **Después de Pages + Render:**
 1. Cloudflare añade records A/CNAME automáticamente
-2. En Railway/Render, actualiza `CORS_ORIGINS`:
+2. En Render, actualiza `CORS_ORIGINS`:
    ```
    https://cuantocuestauruguay.com,https://www.cuantocuestauruguay.com
    ```
-3. Prueba: `curl https://tu-render-api/api/v1/productos`
+3. Prueba: `curl https://preciosregulados-api.onrender.com/api/v1/productos`
 
 ## 🤝 Contribuir
 

@@ -5,6 +5,7 @@ import logging
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.routers import precios_router, etl_router
+from app.middleware.security import setup_security_middleware
 
 # Configure logging
 logging.basicConfig(
@@ -33,6 +34,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Configure security middleware (headers, rate limiting)
+setup_security_middleware(app)
 
 # Include routers
 app.include_router(precios_router)
