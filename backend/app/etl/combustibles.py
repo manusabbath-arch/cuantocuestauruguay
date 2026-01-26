@@ -138,6 +138,10 @@ class CombustiblesETL:
         try:
             # Primero, asegurar que los productos existen
             await self._ensure_productos()
+            
+            # Log de productos en BD para debugging
+            all_productos = self.db.query(Producto).filter(Producto.categoria == "combustible").all()
+            logger.info(f"Found {len(all_productos)} combustible products in DB: {[p.nombre for p.nombre in all_productos]}")
 
             # Mapeo de nombres de CKAN a nombres en nuestra BD (solo los prioritarios)
             nombre_map = {
@@ -226,14 +230,25 @@ class CombustiblesETL:
 
     async def _ensure_productos(self):
         """Asegura que los productos básicos existen en la base de datos"""
+        created = 0
+        existing_count = 0
+        
         for nombre in self.PRODUCTOS_MAP.values():
             existing = self.db.query(Producto).filter(Producto.nombre == nombre).first()
 
             if not existing:
-                nuevo_producto = Producto(nombre=nombre, categoria="combustible", unidad="litro", activo=True)
+                nuevo_producto = Producto(
+                    nombre=nombre, categoria="combustible", unidad="litro", activo=True
+                )
                 self.db.add(nuevo_producto)
+                created += 1
+            else:
+                existing_count += 1
 
         self.db.commit()
+        logger.info(
+            f"_ensure_productos: Created {created}, Already existing {existing_count}"
+        )
 
     async def run(self) -> Dict[str, any]:
         """Ejecuta el pipeline ETL completo"""
