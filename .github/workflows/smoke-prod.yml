@@ -1,0 +1,20 @@
+name: Smoke Test Production
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'  # Diario 06:00 UTC
+
+jobs:
+  smoke-prod:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check frontend availability
+        run: |
+          curl --fail --max-time 15 -I https://cuantocuestauruguay.com
+      - name: Check API health
+        run: |
+          curl --fail --max-time 15 https://preciosregulados-api.onrender.com/health
+      - name: Check API productos
+        run: |
+          curl --fail --max-time 20 https://preciosregulados-api.onrender.com/api/v1/productos | head -c 500
