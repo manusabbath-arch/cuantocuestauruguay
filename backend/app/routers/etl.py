@@ -1,11 +1,13 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.etl.combustibles import CombustiblesETL
 from app.etl.utilities import UtilitiesETL
+from app.models.models import Precio, Producto
 
 router = APIRouter(prefix="/api/v1/etl", tags=["etl"])
 
@@ -81,3 +83,31 @@ async def obtener_estado():
         "last_run": None,
         "available_services": ["combustibles", "ute", "ose", "antel"],
     }
+
+
+@router.get("/debug/db-stats")
+async def obtener_estadisticas_bd(db: Session = Depends(get_db)):
+    """Obtiene estadísticas de la base de datos para debugging"""
+    try:
+        # Contar productos por categoría
+        productos_count = db.query(Producto.categoria, func.count(Producto.id)).group_by(Producto.categoria).all()
+        
+        # Contar precios totales
+        precios_total = db.query(func.count(Precio.id)).scalar()
+        
+        # Contar precios por producto (top 10)
+        precios_por_producto = (
+            db.query(Producto.nombre, func.count(Precio.id))
+            .join(Precio, Producto.id == Precio.producto_id, isouter=True)
+            .group_by(Producto.nombre)
+            .limit(10)
+            .all()
+        )
+        
+        return {
+            "productos_por_categoria": dict(productos_count),
+            "total_precios": precios_total,
+            "precios_por_producto": {nombre: count for nombre, count in precios_por_producto},
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas: {str(e)}")
