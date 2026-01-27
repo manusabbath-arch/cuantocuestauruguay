@@ -1,0 +1,25 @@
+name: ETL Healthcheck
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"  # cada 6 horas
+  workflow_dispatch:
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run ETL health checks
+        env:
+          API_BASE: ${{ secrets.ETL_API_BASE_URL }}
+          TIMEOUT: 15
+        run: |
+          if [[ -z "${API_BASE}" ]]; then
+            echo "API_BASE no configurado (secrets.ETL_API_BASE_URL)" >&2
+            exit 1
+          fi
+          bash scripts/etl_healthcheck.sh
