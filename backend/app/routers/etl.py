@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,7 +9,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.database import get_db
 from app.etl.combustibles_v2 import CombustiblesETLv2
 from app.etl.utilities import UtilitiesETL, TARIFF_HISTORY
-from app.services.shadow_mode import ShadowModeExecutor
+from app.services.shadow_mode import ShadowModeExecutor, shadow_log_repo
 from app.etl.alerts import alert_manager
 from app.models.models import Precio, Producto
 from app.scheduler import scheduler
@@ -249,5 +250,17 @@ async def obtener_historico_producto(producto_key: str):
         "producto": producto_key,
         "historia": TARIFF_HISTORY[producto_key],
         "variacion": variation,
+    }
+
+
+@router.get("/shadow/logs")
+async def obtener_shadow_logs(limit: int = 50):
+    """Devuelve los logs recientes de shadow mode (v1 vs v2)."""
+    logs = shadow_log_repo.list()
+    sliced = logs[-limit:] if limit and limit > 0 else logs
+    return {
+        "count": len(logs),
+        "returned": len(sliced),
+        "logs": [asdict(entry) for entry in sliced],
     }
 
