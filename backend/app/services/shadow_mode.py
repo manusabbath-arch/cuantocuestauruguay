@@ -16,11 +16,14 @@ from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from pathlib import Path
+
 from app.services.shadow_mode_logs import ShadowModeLogRepository
 
 logger = logging.getLogger(__name__)
 
-shadow_log_repo = ShadowModeLogRepository()
+default_log_path = Path(__file__).resolve().parents[2] / "logs" / "shadow_logs.jsonl"
+shadow_log_repo = ShadowModeLogRepository(str(default_log_path))
 
 
 class ShadowModeExecutor:

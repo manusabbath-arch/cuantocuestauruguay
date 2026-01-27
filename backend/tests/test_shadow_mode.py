@@ -202,3 +202,16 @@ async def test_get_etl_pair_antel_wrapped(monkeypatch, db_session):
     assert calls["v2_run"] is True
     assert v1_result["records_loaded"] == 9
     assert v2_result["records_processed"] == 9
+
+
+def test_shadow_log_repo_persists_jsonl(tmp_path):
+    log_path = tmp_path / "shadow.jsonl"
+    repo = ShadowModeLogRepository(str(log_path))
+
+    repo.save("combustibles", {"success": True}, {"success": True}, {"match": True})
+    repo.save("ute", {"success": True}, {"success": False}, {"match": False})
+
+    lines = log_path.read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 2
+    assert "combustibles" in lines[0]
+    assert "ute" in lines[1]
