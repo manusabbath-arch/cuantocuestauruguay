@@ -130,3 +130,75 @@ async def test_get_etl_pair_ute_wrapped(monkeypatch, db_session):
     assert calls["v2_run"] is True
     assert v1_result["records_loaded"] == 7
     assert v2_result["records_processed"] == 7
+
+
+@pytest.mark.asyncio
+async def test_get_etl_pair_ose_wrapped(monkeypatch, db_session):
+    calls = {}
+
+    class DummyUtilities:
+        def __init__(self, db):
+            calls["v1_db"] = db
+
+        async def run_ose(self):
+            calls["v1_run"] = True
+            return {"success": True, "records_loaded": 4}
+
+    class DummyOSEv2:
+        def __init__(self, db):
+            calls["v2_db"] = db
+
+        async def run(self):
+            calls["v2_run"] = True
+            return {"success": True, "records_processed": 4}
+
+    monkeypatch.setitem(sys.modules, "app.etl.utilities", SimpleNamespace(UtilitiesETL=DummyUtilities))
+    monkeypatch.setitem(sys.modules, "app.etl.ose_v2", SimpleNamespace(OSEETLv2=DummyOSEv2))
+
+    executor = ShadowModeExecutor(db_session)
+    v1_runner, v2_runner = executor._get_etl_pair("ose")
+
+    v1_result, v2_result = await asyncio.gather(v1_runner.run(), v2_runner.run())
+
+    assert calls["v1_db"] is db_session
+    assert calls["v2_db"] is db_session
+    assert calls["v1_run"] is True
+    assert calls["v2_run"] is True
+    assert v1_result["records_loaded"] == 4
+    assert v2_result["records_processed"] == 4
+
+
+@pytest.mark.asyncio
+async def test_get_etl_pair_antel_wrapped(monkeypatch, db_session):
+    calls = {}
+
+    class DummyUtilities:
+        def __init__(self, db):
+            calls["v1_db"] = db
+
+        async def run_antel(self):
+            calls["v1_run"] = True
+            return {"success": True, "records_loaded": 9}
+
+    class DummyAntelv2:
+        def __init__(self, db):
+            calls["v2_db"] = db
+
+        async def run(self):
+            calls["v2_run"] = True
+            return {"success": True, "records_processed": 9}
+
+    monkeypatch.setitem(sys.modules, "app.etl.utilities", SimpleNamespace(UtilitiesETL=DummyUtilities))
+    monkeypatch.setitem(sys.modules, "app.etl.antel_v2", SimpleNamespace(AntelETLv2=DummyAntelv2))
+
+    executor = ShadowModeExecutor(db_session)
+    v1_runner, v2_runner = executor._get_etl_pair("antel")
+
+    v1_result, v2_result = await asyncio.gather(v1_runner.run(), v2_runner.run())
+
+    assert calls["v1_db"] is db_session
+    assert calls["v2_db"] is db_session
+    assert calls["v1_run"] is True
+    assert calls["v2_run"] is True
+    assert v1_result["records_loaded"] == 9
+    assert v2_result["records_processed"] == 9

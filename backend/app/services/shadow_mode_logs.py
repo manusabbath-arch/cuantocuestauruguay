@@ -8,7 +8,7 @@ repository when a table is defined.
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ class ShadowLogEntry:
     v1: Dict[str, Any]
     v2: Dict[str, Any]
     comparison: Dict[str, Any]
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class ShadowModeLogRepository:

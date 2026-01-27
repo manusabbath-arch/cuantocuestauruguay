@@ -20,13 +20,15 @@ from app.services.shadow_mode_logs import ShadowModeLogRepository
 
 logger = logging.getLogger(__name__)
 
+shadow_log_repo = ShadowModeLogRepository()
+
 
 class ShadowModeExecutor:
     """Executes ETL v1 and v2 in parallel and compares the results."""
 
     def __init__(self, db_session: Session, log_repo: Optional[ShadowModeLogRepository] = None):
         self.db_session = db_session
-        self.log_repo = log_repo or ShadowModeLogRepository()
+        self.log_repo = log_repo or shadow_log_repo
 
     async def run_shadow(self, etl_name: str) -> Dict[str, Any]:
         """
