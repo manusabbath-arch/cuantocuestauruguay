@@ -1,6 +1,8 @@
 """Tests for shadow mode executor."""
 
 import asyncio
+import sys
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -85,3 +87,39 @@ def test_compare_results_simple_diff():
     assert comparison["match"] is False
     assert comparison["differences"]["success"] == {"v1": True, "v2": False}
     assert comparison["differences"]["records_processed"] == {"v1": 10, "v2": 5}
+
+
+@pytest.mark.asyncio
+async def test_get_etl_pair_ute_wrapped(monkeypatch, db_session):
+    calls = {}
+
+    class DummyUtilities:
+        def __init__(self, db):
+            calls["v1_db"] = db
+
+        async def run_ute(self):
+            calls["v1_run"] = True
+            return {"success": True, "records_loaded": 7}
+
+    class DummyUTEv2:
+        def __init__(self, db):
+            calls["v2_db"] = db
+
+        async def run(self):
+            calls["v2_run"] = True
+            return {"success": True, "records_processed": 7}
+
+    monkeypatch.setitem(sys.modules, "app.etl.utilities", SimpleNamespace(UtilitiesETL=DummyUtilities))
+    monkeypatch.setitem(sys.modules, "app.etl.ute_v2", SimpleNamespace(UTEETLv2=DummyUTEv2))
+
+    executor = ShadowModeExecutor(db_session)
+    v1_runner, v2_runner = executor._get_etl_pair("ute")
+
+    v1_result, v2_result = await asyncio.gather(v1_runner.run(), v2_runner.run())
+
+    assert calls["v1_db"] is db_session
+    assert calls["v2_db"] is db_session
+    assert calls["v1_run"] is True
+    assert calls["v2_run"] is True
+    assert v1_result["records_loaded"] == 7
+    assert v2_result["records_processed"] == 7

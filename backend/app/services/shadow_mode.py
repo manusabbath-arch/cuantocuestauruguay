@@ -11,6 +11,7 @@ Use cases:
 import asyncio
 import logging
 import time
+from types import SimpleNamespace
 from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
@@ -130,13 +131,39 @@ class ShadowModeExecutor:
             return CombustiblesETL(self.db_session), CombustiblesETLv2(self.db_session)
 
         if etl_name == "ute":
-            # v1 está en utilities.py como función; se deja pendiente para integración.
-            raise ValueError("Shadow mode for UTE v1 not wired yet")
+            from app.etl.utilities import UtilitiesETL
+            from app.etl.ute_v2 import UTEETLv2
+
+            util = UtilitiesETL(self.db_session)
+            v1_runner = self._wrap_utilities_method(util.run_ute)
+            return v1_runner, UTEETLv2(self.db_session)
 
         if etl_name == "ose":
-            raise ValueError("Shadow mode for OSE v1 not wired yet")
+            from app.etl.utilities import UtilitiesETL
+            from app.etl.ose_v2 import OSEETLv2
+
+            util = UtilitiesETL(self.db_session)
+            v1_runner = self._wrap_utilities_method(util.run_ose)
+            return v1_runner, OSEETLv2(self.db_session)
 
         if etl_name == "antel":
-            raise ValueError("Shadow mode for Antel v1 not wired yet")
+            from app.etl.utilities import UtilitiesETL
+            from app.etl.antel_v2 import AntelETLv2
+
+            util = UtilitiesETL(self.db_session)
+            v1_runner = self._wrap_utilities_method(util.run_antel)
+            return v1_runner, AntelETLv2(self.db_session)
 
         raise ValueError(f"Unknown ETL name: {etl_name}")
+
+    def _wrap_utilities_method(self, coro_fn) -> Any:
+        """Wrap legacy utilities async methods to present a run() interface."""
+
+        class _Runner:
+            def __init__(self, fn):
+                self._fn = fn
+
+            async def run(self):
+                return await self._fn()
+
+        return _Runner(coro_fn)
