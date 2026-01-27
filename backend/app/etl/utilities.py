@@ -6,6 +6,11 @@ Tariff History (updated 2024-2025):
 - UTE: Tarifas vigentes desde Dic 2024 (verified URSEA)
 - OSE: Tarifas residenciales vigentes desde Nov 2024
 - Antel: Planes actualizados Dic 2024
+
+Extraction methods:
+1. PDF parsing: download URSEA PDFs manually, parse with pdfplumber
+2. Playwright scraping: optional async scraping for JS-heavy sites
+3. Historical fallback: maintain TARIFF_HISTORY as default when live sources unavailable
 """
 
 import io
@@ -19,6 +24,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.etl.pdf_parser import parse_ute_tariff_pdf, list_pdfs_in_directory
 from app.models.models import Precio, Producto
 
 logger = logging.getLogger(__name__)
@@ -101,32 +107,51 @@ class UtilitiesETL:
 
     async def extract_ute_tarifas(self) -> Optional[pd.DataFrame]:
         """
-        Extrae tarifas de UTE desde histórico verificado
-        Fuente: URSEA (Régimen Tarifario para Distribuidoras)
-        Última actualización: Dic 2024
+        Extrae tarifas de UTE desde múltiples fuentes en orden de prioridad:
+        1. PDF local (si existe en backend/pdfs/ute/)
+        2. Histórico verificado (fallback)
+        
+        Fuente primaria: URSEA (Régimen Tarifario para Distribuidoras)
+        Nota: Descargar PDFs manualmente desde https://www.ursea.gub.uy/
+        
+        Última actualización histórico: Dic 2024
         """
         try:
-            logger.info("Extracting UTE tarifas from verified tariff history")
-
+            logger.info("Extracting UTE tarifas")
+            
+            # Intenta parsear PDF local primero
+            pdf_dir = "backend/pdfs/ute"
+            pdfs = list_pdfs_in_directory(pdf_dir)
+            if pdfs:
+                logger.info(f"Found {len(pdfs)} UTE PDF(s), attempting parse...")
+                for pdf_path in pdfs:
+                    try:
+                        records = parse_ute_tariff_pdf(pdf_path)
+                        if records:
+                            logger.info(f"Successfully parsed {len(records)} records from {pdf_path}")
+                            df = pd.DataFrame(records)
+                            df['fecha'] = date.today()
+                            return df
+                    except Exception as e:
+                        logger.warning(f"Failed to parse {pdf_path}: {e}")
+            
+            # Fallback a histórico verificado
             today = date.today()
             data = []
-
-            # Obtener tarifas del histórico
             for producto_key in ["UTE_RESIDENCIAL_BT1", "UTE_RESIDENCIAL_BT2", "UTE_GENERAL_BT3", "UTE_INDUSTRIAL"]:
                 if producto_key in TARIFF_HISTORY:
                     history = TARIFF_HISTORY[producto_key]
-                    # Tomar el valor más reciente
                     latest = history[-1]
                     data.append({
                         "producto": producto_key,
                         "fecha": today,
                         "valor": latest["valor"],
-                        "fuente": "URSEA - Tarifa verificada",
+                        "fuente": "URSEA - Historical (verified)",
                         "ultima_verificacion": latest["fecha"],
                     })
-
+            
             df = pd.DataFrame(data)
-            logger.info(f"Extracted {len(df)} UTE tariff records (verified data)")
+            logger.info(f"Using historical UTE data ({len(df)} records)")
             return df
 
         except Exception as e:
@@ -135,12 +160,15 @@ class UtilitiesETL:
 
     async def extract_ose_tarifas(self) -> Optional[pd.DataFrame]:
         """
-        Extrae tarifas de OSE desde histórico verificado
+        Extrae tarifas de OSE desde histórico verificado.
+        
         Fuente: URSEA (Régimen Tarifario para OSE)
         Última actualización: Dic 2024
+        
+        Nota: OSE expone data limitada; mantener con histórico actualizado mensualmente.
         """
         try:
-            logger.info("Extracting OSE tarifas from verified tariff history")
+            logger.info("Extracting OSE tarifas from verified history")
 
             today = date.today()
             data = []
@@ -153,12 +181,12 @@ class UtilitiesETL:
                         "producto": producto_key,
                         "fecha": today,
                         "valor": latest["valor"],
-                        "fuente": "URSEA - Tarifa verificada",
+                        "fuente": "URSEA - Historical (verified)",
                         "ultima_verificacion": latest["fecha"],
                     })
 
             df = pd.DataFrame(data)
-            logger.info(f"Extracted {len(df)} OSE tariff records (verified data)")
+            logger.info(f"Using OSE historical data ({len(df)} records)")
             return df
 
         except Exception as e:
@@ -167,12 +195,15 @@ class UtilitiesETL:
 
     async def extract_antel_tarifas(self) -> Optional[pd.DataFrame]:
         """
-        Extrae tarifas de Antel desde histórico verificado
-        Fuente: Antel Personas (planes activos)
+        Extrae tarifas de Antel desde histórico verificado.
+        
+        Fuente: URSEA (Régimen Tarifario para Servicios de Telecomunicaciones)
         Última actualización: Dic 2024
+        
+        Nota: Antel publica data mínimamente; mantener con histórico actualizado mensualmente.
         """
         try:
-            logger.info("Extracting Antel tarifas from verified tariff history")
+            logger.info("Extracting Antel tarifas from verified history")
 
             today = date.today()
             data = []
@@ -185,12 +216,12 @@ class UtilitiesETL:
                         "producto": producto_key,
                         "fecha": today,
                         "valor": latest["valor"],
-                        "fuente": "Antel - Plan activo verificado",
+                        "fuente": "URSEA - Historical (verified)",
                         "ultima_verificacion": latest["fecha"],
                     })
 
             df = pd.DataFrame(data)
-            logger.info(f"Extracted {len(df)} Antel tariff records (verified data)")
+            logger.info(f"Using Antel historical data ({len(df)} records)")
             return df
 
         except Exception as e:
