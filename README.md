@@ -98,6 +98,13 @@ backend/
 - Railway.app / Render.com (backend hosting)
 - Cloudflare Pages (frontend hosting)
 
+### 🔒 Dependabot
+
+- Configuración en [.github/dependabot.yml](.github/dependabot.yml)
+- Pip (backend) y npm (frontend) corren semanalmente los lunes (04:00 y 04:30 UTC)
+- Límite de 5 PR abiertas, etiquetas `deps` y `security`
+- No hay auto-merge: revisar PR y ejecutar tests antes de fusionar
+
 ## 🚀 Inicio Rápido
 
 ### Prerrequisitos
