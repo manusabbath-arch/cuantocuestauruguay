@@ -16,14 +16,17 @@ from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from app.services.shadow_mode_logs import ShadowModeLogRepository
+
 logger = logging.getLogger(__name__)
 
 
 class ShadowModeExecutor:
     """Executes ETL v1 and v2 in parallel and compares the results."""
 
-    def __init__(self, db_session: Session):
+    def __init__(self, db_session: Session, log_repo: Optional[ShadowModeLogRepository] = None):
         self.db_session = db_session
+        self.log_repo = log_repo or ShadowModeLogRepository()
 
     async def run_shadow(self, etl_name: str) -> Dict[str, Any]:
         """
@@ -38,6 +41,8 @@ class ShadowModeExecutor:
         )
 
         comparison = self.compare_results(v1_result, v2_result)
+
+        self.log_repo.save(etl_name, v1_result, v2_result, comparison)
 
         if comparison["match"]:
             logger.info("Shadow mode matched for %s", etl_name)

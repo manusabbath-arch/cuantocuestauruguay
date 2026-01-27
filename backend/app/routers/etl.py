@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.database import get_db
 from app.etl.combustibles_v2 import CombustiblesETLv2
 from app.etl.utilities import UtilitiesETL, TARIFF_HISTORY
+from app.services.shadow_mode import ShadowModeExecutor
 from app.etl.alerts import alert_manager
 from app.models.models import Precio, Producto
 from app.scheduler import scheduler
@@ -16,9 +17,13 @@ router = APIRouter(prefix="/api/v1/etl", tags=["etl"])
 
 
 @router.post("/run")
-async def ejecutar_etl(db: Session = Depends(get_db)):
-    """Ejecuta el proceso ETL de combustibles manualmente"""
+async def ejecutar_etl(shadow_mode: bool = False, db: Session = Depends(get_db)):
+    """Ejecuta el proceso ETL de combustibles manualmente (opcional shadow mode)."""
     try:
+        if shadow_mode:
+            executor = ShadowModeExecutor(db)
+            return await executor.run_shadow("combustibles")
+
         etl = CombustiblesETLv2(db)
         # CombustiblesETLv2 es sincrónico (hereda de ETLBase); usar threadpool
         result = await run_in_threadpool(etl.run)
@@ -28,7 +33,7 @@ async def ejecutar_etl(db: Session = Depends(get_db)):
 
 
 @router.post("/utilities/run")
-async def ejecutar_utilities_etl(service: Optional[str] = None, db: Session = Depends(get_db)):
+async def ejecutar_utilities_etl(service: Optional[str] = None, shadow_mode: bool = False, db: Session = Depends(get_db)):
     """
     Ejecuta el proceso ETL de servicios públicos (UTE, OSE, Antel)
 
@@ -41,16 +46,30 @@ async def ejecutar_utilities_etl(service: Optional[str] = None, db: Session = De
 
         if service:
             service = service.lower()
-            if service == "ute":
-                result = await etl.run_ute()
-            elif service == "ose":
-                result = await etl.run_ose()
-            elif service == "antel":
-                result = await etl.run_antel()
+            if shadow_mode:
+                executor = ShadowModeExecutor(db)
+                if service not in {"ute", "ose", "antel"}:
+                    raise HTTPException(status_code=400, detail=f"Servicio no válido: {service}. Opciones: ute, ose, antel")
+                result = await executor.run_shadow(service)
             else:
-                raise HTTPException(status_code=400, detail=f"Servicio no válido: {service}. Opciones: ute, ose, antel")
+                if service == "ute":
+                    result = await etl.run_ute()
+                elif service == "ose":
+                    result = await etl.run_ose()
+                elif service == "antel":
+                    result = await etl.run_antel()
+                else:
+                    raise HTTPException(status_code=400, detail=f"Servicio no válido: {service}. Opciones: ute, ose, antel")
         else:
-            result = await etl.run_all()
+            if shadow_mode:
+                executor = ShadowModeExecutor(db)
+                result = {
+                    "ute": await executor.run_shadow("ute"),
+                    "ose": await executor.run_shadow("ose"),
+                    "antel": await executor.run_shadow("antel"),
+                }
+            else:
+                result = await etl.run_all()
 
         return result
     except HTTPException:

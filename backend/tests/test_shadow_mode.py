@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.services.shadow_mode import ShadowModeExecutor
+from app.services.shadow_mode_logs import ShadowModeLogRepository
 
 
 @pytest.fixture
@@ -18,7 +19,8 @@ def db_session():
 
 @pytest.mark.asyncio
 async def test_run_shadow_calls_both_and_returns_v1(monkeypatch, db_session):
-    executor = ShadowModeExecutor(db_session)
+    log_repo = ShadowModeLogRepository()
+    executor = ShadowModeExecutor(db_session, log_repo)
 
     etl_v1 = MagicMock()
     etl_v1.run = AsyncMock(return_value={"success": True, "records_loaded": 5})
@@ -35,11 +37,13 @@ async def test_run_shadow_calls_both_and_returns_v1(monkeypatch, db_session):
     assert result["comparison"]["match"] is True
     assert result["returned"]["success"] is True
     assert result["returned"]["records_processed"] == 5
+    assert len(log_repo.list()) == 1
 
 
 @pytest.mark.asyncio
 async def test_run_shadow_detects_discrepancy(monkeypatch, db_session):
-    executor = ShadowModeExecutor(db_session)
+    log_repo = ShadowModeLogRepository()
+    executor = ShadowModeExecutor(db_session, log_repo)
 
     etl_v1 = MagicMock()
     etl_v1.run = AsyncMock(return_value={"success": True, "records_loaded": 5})
@@ -55,11 +59,13 @@ async def test_run_shadow_detects_discrepancy(monkeypatch, db_session):
     assert "records_processed" in result["comparison"]["differences"]
     assert result["v1"]["records_processed"] == 5
     assert result["v2"]["records_processed"] == 3
+    assert len(log_repo.list()) == 1
 
 
 @pytest.mark.asyncio
 async def test_run_shadow_handles_v2_failure(monkeypatch, db_session):
-    executor = ShadowModeExecutor(db_session)
+    log_repo = ShadowModeLogRepository()
+    executor = ShadowModeExecutor(db_session, log_repo)
 
     etl_v1 = MagicMock()
     etl_v1.run = AsyncMock(return_value={"success": True, "records_loaded": 2})
@@ -74,6 +80,7 @@ async def test_run_shadow_handles_v2_failure(monkeypatch, db_session):
     assert result["comparison"]["match"] is False
     assert result["v2"]["success"] is False
     assert "boom" in result["v2"]["errors"][0]
+    assert len(log_repo.list()) == 1
 
 
 def test_compare_results_simple_diff():
