@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-01-27T05:28:04.132028Z",
+  "phase": "CANARY",
+  "flags": {
+    "combustibles": {
+      "phase": "DISABLED",
+      "percentage": 0,
+      "enabled": false
+    },
+    "ute": {
+      "phase": "DISABLED",
+      "percentage": 0,
+      "enabled": false
+    },
+    "ose": {
+      "phase": "DISABLED",
+      "percentage": 0,
+      "enabled": false
+    },
+    "antel": {
+      "phase": "DISABLED",
+      "percentage": 0,
+      "enabled": false
+    }
+  }
+}

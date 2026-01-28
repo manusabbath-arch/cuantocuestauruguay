@@ -12,6 +12,18 @@ export const productosService = {
     const response = await api.get(`/api/v1/productos/${id}`)
     return response.data
   },
+
+  getPrecioUltimo: async (productoId: number): Promise<Precio> => {
+    const response = await api.get(`/api/v1/precios/${productoId}/ultimo`)
+    return response.data
+  },
+
+  getVariacion: async (productoId: number, dias: number = 30): Promise<Variacion> => {
+    const response = await api.get(`/api/v1/variacion/${productoId}`, {
+      params: { periodo: dias >= 365 ? 'anio' : dias >= 30 ? 'mes' : 'semana' },
+    })
+    return response.data
+  },
 }
 
 export const preciosService = {

@@ -1,13 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
 import { productosService, preciosService, variacionService } from '../services/productos'
 import PriceCard from '../components/PriceCard'
-import { Fuel, AlertCircle } from 'lucide-react'
+import { Fuel, AlertCircle, TrendingUp, BarChart3 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { trackEvent } from '../lib/analytics'
 
 export default function Home() {
+  const navigate = useNavigate()
   const { data: productos, isLoading: loadingProductos } = useQuery({
     queryKey: ['productos', 'combustible'],
     queryFn: () => productosService.getAll('combustible'),
   })
+
+  const handleNavigate = (path: string, eventName: string) => {
+    trackEvent(eventName, { source: 'home_cta' })
+    navigate(path)
+  }
 
   return (
     <div className="space-y-8">
@@ -21,9 +29,27 @@ export default function Home() {
           <p className="text-xl text-blue-100 mb-4">
             Consulta precios de combustibles y servicios regulados en Uruguay
           </p>
-          <p className="text-blue-100">
+          <p className="text-blue-100 mb-6">
             Datos oficiales actualizados desde ANCAP, MEF y URSEA
           </p>
+          
+          {/* Quick Action Buttons */}
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => handleNavigate('/precio-nafta-hoy', 'home_cta_nafta')}
+              className="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors flex items-center gap-2"
+            >
+              <TrendingUp className="w-5 h-5" />
+              Ver Precio Nafta HOY
+            </button>
+            <button
+              onClick={() => handleNavigate('/comparador', 'home_cta_comparador')}
+              className="bg-blue-700 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-800 transition-colors flex items-center gap-2"
+            >
+              <BarChart3 className="w-5 h-5" />
+              Comparar Precios
+            </button>
+          </div>
         </div>
       </div>
 
@@ -70,19 +96,39 @@ export default function Home() {
       </section>
 
       {/* Call to Action */}
-      <div className="bg-white rounded-lg shadow-md p-8 text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          Compara precios históricos
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Utiliza nuestro comparador para ver la evolución de precios en el tiempo
-        </p>
-        <a
-          href="/comparador"
-          className="inline-block bg-primary text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors font-medium"
-        >
-          Ir al Comparador
-        </a>
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg shadow-md p-8 border-l-4 border-amber-400">
+        <div className="grid md:grid-cols-2 gap-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-amber-500" />
+              Precio Nafta HOY
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Consulta el precio actual de todos los combustibles con variación del mes
+            </p>
+            <button
+              onClick={() => handleNavigate('/precio-nafta-hoy', 'home_cta_nafta_detail')}
+              className="inline-block bg-amber-500 text-white px-6 py-2 rounded-lg hover:bg-amber-600 transition-colors font-medium"
+            >
+              Ver Detalles
+            </button>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+              <BarChart3 className="w-6 h-6 text-blue-500" />
+              Comparador Histórico
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Compara precios de múltiples productos en el tiempo y descubre tendencias
+            </p>
+            <button
+              onClick={() => handleNavigate('/comparador', 'home_cta_comparador_detail')}
+              className="inline-block bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium"
+            >
+              Abrir Comparador
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

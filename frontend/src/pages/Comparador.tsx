@@ -1,9 +1,52 @@
-import { useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { productosService, comparadorService } from '../services/productos'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { format, parseISO, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { trackEvent } from '../lib/analytics'
+import { Loader, AlertCircle } from 'lucide-react'
+
+// Skeleton loader para gráfico
+function ChartSkeleton() {
+  return (
+    <div className="h-96 bg-gradient-to-r from-gray-100 to-gray-50 rounded-lg animate-pulse flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <Loader className="w-8 h-8 text-gray-400 animate-spin" />
+        <p className="text-gray-500">Cargando gráfico...</p>
+      </div>
+    </div>
+  )
+}
+
+// Skeleton para selector de productos
+function ProductosSkeleton() {
+  return (
+    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+      {[...Array(6)].map((_, i) => (
+        <div
+          key={i}
+          className="p-3 rounded-lg border-2 border-gray-200 bg-gray-50 animate-pulse"
+        >
+          <div className="h-5 bg-gray-300 rounded mb-2 w-3/4" />
+          <div className="h-4 bg-gray-200 rounded w-1/2" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Error boundary para manejo de errores
+function ErrorMessage({ error }: { error: string }) {
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3 mb-4">
+      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+      <div className="text-sm text-red-800">
+        <strong>Error:</strong> {error}
+      </div>
+    </div>
+  )
+}
 
 export default function Comparador() {
   const [selectedProductos, setSelectedProductos] = useState<number[]>([])
@@ -11,27 +54,51 @@ export default function Comparador() {
     format(subMonths(new Date(), 6), 'yyyy-MM-dd')
   )
 
-  const { data: productos } = useQuery({
+  const { data: productos, isLoading: loadingProductos, error: productosError } = useQuery({
     queryKey: ['productos'],
     queryFn: () => productosService.getAll(),
   })
 
-  const { data: comparacion, isLoading: loadingComparacion } = useQuery({
+  const { data: comparacion, isLoading: loadingComparacion, error: comparacionError } = useQuery({
     queryKey: ['comparacion', selectedProductos, fechaDesde],
     queryFn: () => comparadorService.comparar(selectedProductos, fechaDesde),
     enabled: selectedProductos.length > 0,
+    retry: 2,
+    onSuccess: (data) => {
+      if (data?.datos?.length) {
+        trackEvent('comparacion_realizada', {
+          productos: selectedProductos.join(','),
+          cantidad_productos: selectedProductos.length,
+          fecha_desde: fechaDesde,
+          puntos: data.datos.length,
+        })
+      }
+    },
+    onError: (error) => {
+      trackEvent('comparador_error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      })
+    },
   })
 
   const handleProductoToggle = (productoId: number) => {
     setSelectedProductos((prev) => {
       if (prev.includes(productoId)) {
-        return prev.filter((id) => id !== productoId)
+        const next = prev.filter((id) => id !== productoId)
+        trackEvent('comparador_toggle', { producto_id: productoId, seleccionado: false, total: next.length })
+        return next
       } else if (prev.length < 5) {
-        return [...prev, productoId]
+        const next = [...prev, productoId]
+        trackEvent('comparador_toggle', { producto_id: productoId, seleccionado: true, total: next.length })
+        return next
       }
       return prev
     })
   }
+
+  useEffect(() => {
+    trackEvent('comparador_fecha_desde_cambio', { fecha_desde: fechaDesde })
+  }, [fechaDesde])
 
   const chartData = comparacion?.datos.map((item) => ({
     fecha: format(parseISO(item.fecha), 'MMM yyyy', { locale: es }),
@@ -51,29 +118,43 @@ export default function Comparador() {
         </p>
       </div>
 
+      {/* Error messages */}
+      {productosError && (
+        <ErrorMessage error="Error cargando productos. Por favor intenta de nuevo." />
+      )}
+      {comparacionError && (
+        <ErrorMessage error="Error cargando datos de comparación. Por favor selecciona otros productos." />
+      )}
+
       {/* Selector de productos */}
       <div className="bg-white rounded-lg shadow-md p-6">
         <h2 className="text-lg font-semibold mb-4">
           Seleccionar Productos ({selectedProductos.length}/5)
         </h2>
         
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {productos?.map((producto) => (
-            <button
-              key={producto.id}
-              onClick={() => handleProductoToggle(producto.id)}
-              disabled={!selectedProductos.includes(producto.id) && selectedProductos.length >= 5}
-              className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                selectedProductos.includes(producto.id)
-                  ? 'border-primary bg-blue-50 text-primary'
-                  : 'border-gray-200 hover:border-gray-300'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <div className="font-medium">{producto.nombre}</div>
-              <div className="text-sm text-gray-500">{producto.categoria}</div>
-            </button>
-          ))}
-        </div>
+        {loadingProductos ? (
+          <ProductosSkeleton />
+        ) : productos && productos.length > 0 ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {productos.map((producto) => (
+              <button
+                key={producto.id}
+                onClick={() => handleProductoToggle(producto.id)}
+                disabled={!selectedProductos.includes(producto.id) && selectedProductos.length >= 5}
+                className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                  selectedProductos.includes(producto.id)
+                    ? 'border-primary bg-blue-50 text-primary'
+                    : 'border-gray-200 hover:border-gray-300'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <div className="font-medium">{producto.nombre}</div>
+                <div className="text-sm text-gray-500">{producto.categoria}</div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <ErrorMessage error="No hay productos disponibles. Por favor carga datos primero." />
+        )}
 
         <div className="mt-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -83,7 +164,7 @@ export default function Comparador() {
             type="date"
             value={fechaDesde}
             onChange={(e) => setFechaDesde(e.target.value)}
-            className="border border-gray-300 rounded-lg px-4 py-2"
+            className="border border-gray-300 rounded-lg px-4 py-2 w-full max-w-xs"
           />
         </div>
       </div>
@@ -94,45 +175,45 @@ export default function Comparador() {
           <h2 className="text-lg font-semibold mb-4">Comparación</h2>
           
           {loadingComparacion ? (
-            <div className="h-96 flex items-center justify-center">
-              <div className="text-gray-500">Cargando datos...</div>
-            </div>
+            <ChartSkeleton />
           ) : chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis 
-                  dataKey="fecha" 
-                  stroke="#6b7280"
-                  style={{ fontSize: '12px' }}
-                />
-                <YAxis 
-                  stroke="#6b7280"
-                  style={{ fontSize: '12px' }}
-                  tickFormatter={(value) => `$${value}`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                  }}
-                  formatter={(value: number) => `$${value.toFixed(2)}`}
-                />
-                <Legend />
-                {comparacion?.productos.map((producto, index) => (
-                  <Line
-                    key={producto.id}
-                    type="monotone"
-                    dataKey={producto.id.toString()}
-                    stroke={colors[index % colors.length]}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    name={producto.nombre}
+            <Suspense fallback={<ChartSkeleton />}>
+              <ResponsiveContainer width="100%" height={400}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="fecha" 
+                    stroke="#6b7280"
+                    style={{ fontSize: '12px' }}
                   />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+                  <YAxis 
+                    stroke="#6b7280"
+                    style={{ fontSize: '12px' }}
+                    tickFormatter={(value) => `$${value}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                    }}
+                    formatter={(value: number) => `$${value.toFixed(2)}`}
+                  />
+                  <Legend />
+                  {comparacion?.productos.map((producto, index) => (
+                    <Line
+                      key={producto.id}
+                      type="monotone"
+                      dataKey={producto.id.toString()}
+                      stroke={colors[index % colors.length]}
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      name={producto.nombre}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </Suspense>
           ) : (
             <div className="h-96 flex items-center justify-center">
               <div className="text-gray-500">No hay datos disponibles para este rango de fechas</div>

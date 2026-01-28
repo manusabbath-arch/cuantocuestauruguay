@@ -26,8 +26,8 @@ sys.path.insert(0, str(backend_path))
 
 # Imports de la app
 from app.core.config import settings
-from app.models.models import Precio, Producto
 from app.etl.pdf_parser import list_pdfs_in_directory, parse_ute_tariff_pdf
+from app.models.models import Precio, Producto
 from packages.etl_core import ETLBase
 
 logger = logging.getLogger(__name__)
@@ -111,9 +111,7 @@ class UTEETLv2(ETLBase):
                     try:
                         records = parse_ute_tariff_pdf(pdf_path)
                         if records:
-                            logger.info(
-                                f"Successfully parsed {len(records)} records from {pdf_path}"
-                            )
+                            logger.info(f"Successfully parsed {len(records)} records from {pdf_path}")
                             df = pd.DataFrame(records)
                             df["fecha"] = date.today()
                             df["fuente"] = "PDF Local (URSEA)"
@@ -130,17 +128,20 @@ class UTEETLv2(ETLBase):
                 if producto_key in self.TARIFF_HISTORY:
                     history = self.TARIFF_HISTORY[producto_key]
                     latest = history[-1]
-                    data.append({
-                        "producto": producto_key,
-                        "display_name": display_name,
-                        "fecha": today,
-                        "valor": latest["valor"],
-                        "fuente": "Histórico URSEA (Verificado)",
-                        "ultima_verificacion": latest["fecha"],
-                    })
+                    data.append(
+                        {
+                            "producto": producto_key,
+                            "fecha": today,
+                            "valor": latest["valor"],
+                            "fuente": "Histórico URSEA (Verificado)",
+                            "ultima_verificacion": latest["fecha"],
+                        }
+                    )
 
             df = pd.DataFrame(data)
             logger.info(f"Extracted {len(df)} UTE tariffs from historical data")
+            logger.info(f"DataFrame columns: {df.columns.tolist()}")
+            logger.info(f"DataFrame shape: {df.shape}")
             return df
 
         except Exception as e:
@@ -217,14 +218,10 @@ class UTEETLv2(ETLBase):
 
             for _, row in data.iterrows():
                 producto_key = row["producto"]
-                display_name = self.PRODUCTOS_MAP.get(
-                    producto_key, producto_key
-                )
+                display_name = self.PRODUCTOS_MAP.get(producto_key, producto_key)
 
                 # Ensure Producto exists
-                producto = self.db_session.query(Producto).filter_by(
-                    nombre=display_name
-                ).first()
+                producto = self.db_session.query(Producto).filter_by(nombre=display_name).first()
 
                 if not producto:
                     logger.info(f"Creating new Producto: {display_name}")

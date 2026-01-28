@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import List, Optional
+from time import time
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, func
@@ -19,16 +20,40 @@ from app.models.schemas import (
 
 router = APIRouter(prefix="/api/v1", tags=["precios"])
 
+# Cache simple en memoria con TTL (segundos)
+_CACHE: dict[str, tuple[float, Any]] = {}
+
+
+def _cache_get(key: str):
+    now = time()
+    item = _CACHE.get(key)
+    if not item:
+        return None
+    expiry, value = item
+    if expiry < now:
+        _CACHE.pop(key, None)
+        return None
+    return value
+
+
+def _cache_set(key: str, value, ttl: int = 600):
+    _CACHE[key] = (time() + ttl, value)
+
 
 @router.get("/productos", response_model=List[ProductoResponse])
 async def listar_productos(categoria: Optional[str] = None, activo: bool = True, db: Session = Depends(get_db)):
     """Lista todos los productos disponibles"""
+    cache_key = f"productos:{categoria}:{activo}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     query = db.query(Producto).filter(Producto.activo == activo)
 
     if categoria:
         query = query.filter(Producto.categoria == categoria)
 
     productos = query.all()
+    _cache_set(cache_key, productos, ttl=600)
     return productos
 
 
@@ -75,11 +100,16 @@ async def obtener_precios(
 @router.get("/precios/{producto_id}/ultimo", response_model=PrecioResponse)
 async def obtener_ultimo_precio(producto_id: int, db: Session = Depends(get_db)):
     """Obtiene el precio más reciente de un producto"""
+    cache_key = f"ultimo:{producto_id}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     precio = db.query(Precio).filter(Precio.producto_id == producto_id).order_by(desc(Precio.fecha)).first()
 
     if not precio:
         raise HTTPException(status_code=404, detail="No hay precios disponibles para este producto")
 
+    _cache_set(cache_key, precio, ttl=600)
     return precio
 
 
@@ -147,6 +177,10 @@ async def comparar_productos(
     db: Session = Depends(get_db),
 ):
     """Compara múltiples productos en un rango de fechas"""
+    cache_key = f"comparar:{producto_ids}:{fecha_desde}:{fecha_hasta}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     # Parsear IDs
     try:
         ids = [int(id.strip()) for id in producto_ids.split(",")]
@@ -184,7 +218,9 @@ async def comparar_productos(
     # Convertir a lista de ComparacionItem
     datos = [ComparacionItem(fecha=fecha, valores=valores) for fecha, valores in sorted(datos_por_fecha.items())]
 
-    return ComparacionResponse(productos=productos, datos=datos)
+    result = ComparacionResponse(productos=productos, datos=datos)
+    _cache_set(cache_key, result, ttl=900)
+    return result
 
 
 @router.get("/estadisticas/{producto_id}")

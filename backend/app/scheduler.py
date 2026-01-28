@@ -1,6 +1,7 @@
 """
 Scheduler para ejecutar tareas periódicas de ETL
 """
+
 import asyncio
 import logging
 from datetime import datetime
@@ -11,9 +12,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.core.feature_flags import RolloutPhase, feature_flags
+from app.etl.alerts import alert_manager
 from app.etl.combustibles_v2 import CombustiblesETLv2
 from app.etl.utilities import UtilitiesETL
-from app.etl.alerts import alert_manager
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +32,17 @@ async def run_etl_job():
     logger.info("=" * 80)
 
     db: Session = SessionLocal()
-    
+
     try:
-        # Ejecutar ETL de Combustibles
-        logger.info("Running Combustibles ETL...")
-        combustibles_etl = CombustiblesETLv2(db)
-        # Ejecutar ETL sincrónico en thread para no bloquear loop async
-        combustibles_result = await asyncio.to_thread(combustibles_etl.run)
-        logger.info(f"Combustibles ETL completed: {combustibles_result}")
+        # Ejecutar ETL de Combustibles según feature flags
+        flag = feature_flags.get("combustibles")
+        if flag and flag.enabled and flag.phase != RolloutPhase.DISABLED:
+            logger.info("Running Combustibles ETL...")
+            combustibles_etl = CombustiblesETLv2(db)
+            combustibles_result = await asyncio.to_thread(combustibles_etl.run)
+            logger.info(f"Combustibles ETL completed: {combustibles_result}")
+        else:
+            logger.info("Skipping Combustibles ETL (feature flag disabled)")
 
         # Ejecutar ETL de Utilities
         logger.info("Running Utilities ETL...")
@@ -64,10 +69,7 @@ def start_scheduler():
     # Por defecto se ejecuta a las 2:00 AM según settings
     scheduler.add_job(
         run_etl_job,
-        trigger=CronTrigger(
-            hour=settings.ETL_SCHEDULE_HOUR,
-            minute=settings.ETL_SCHEDULE_MINUTE
-        ),
+        trigger=CronTrigger(hour=settings.ETL_SCHEDULE_HOUR, minute=settings.ETL_SCHEDULE_MINUTE),
         id="etl_daily_job",
         name="Daily ETL Job - Combustibles & Utilities",
         replace_existing=True,
@@ -85,7 +87,9 @@ def start_scheduler():
         )
 
     scheduler.start()
-    logger.info(f"Scheduler started. ETL will run daily at {settings.ETL_SCHEDULE_HOUR:02d}:{settings.ETL_SCHEDULE_MINUTE:02d}")
+    logger.info(
+        f"Scheduler started. ETL will run daily at {settings.ETL_SCHEDULE_HOUR:02d}:{settings.ETL_SCHEDULE_MINUTE:02d}"
+    )
     logger.info(f"Next scheduled run: {scheduler.get_job('etl_daily_job').next_run_time}")
 
 

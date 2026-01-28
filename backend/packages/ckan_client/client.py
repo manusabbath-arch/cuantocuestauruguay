@@ -185,7 +185,29 @@ class CKANClient:
         
         # Parsear según formato
         if format_type in ["csv", "text/csv"]:
-            df = pd.read_csv(StringIO(response.text))
+            # Manejo robusto de CSV: BOM + delimitador automático
+            # 1) Intento con autodetección de separador y BOM
+            try:
+                from io import BytesIO
+                df = pd.read_csv(
+                    BytesIO(response.content),
+                    sep=None,  # autodetecta delimitador (incluye ';')
+                    engine="python",
+                    encoding="utf-8-sig",  # elimina BOM si existe
+                )
+            except Exception:
+                # 2) Fallback explícito a ';' por datasets uruguayos
+                try:
+                    from io import BytesIO
+                    df = pd.read_csv(
+                        BytesIO(response.content),
+                        sep=";",
+                        engine="python",
+                        encoding="utf-8-sig",
+                    )
+                except Exception as e:
+                    logger.error(f"Error parseando CSV: {e}")
+                    raise
         elif format_type in ["json", "application/json"]:
             df = pd.read_json(StringIO(response.text))
         else:

@@ -24,7 +24,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.etl.pdf_parser import parse_ute_tariff_pdf, list_pdfs_in_directory
+from app.etl.pdf_parser import list_pdfs_in_directory, parse_ute_tariff_pdf
 from app.models.models import Precio, Producto
 
 logger = logging.getLogger(__name__)
@@ -110,15 +110,15 @@ class UtilitiesETL:
         Extrae tarifas de UTE desde múltiples fuentes en orden de prioridad:
         1. PDF local (si existe en backend/pdfs/ute/)
         2. Histórico verificado (fallback)
-        
+
         Fuente primaria: URSEA (Régimen Tarifario para Distribuidoras)
         Nota: Descargar PDFs manualmente desde https://www.ursea.gub.uy/
-        
+
         Última actualización histórico: Dic 2024
         """
         try:
             logger.info("Extracting UTE tarifas")
-            
+
             # Intenta parsear PDF local primero
             pdf_dir = "backend/pdfs/ute"
             pdfs = list_pdfs_in_directory(pdf_dir)
@@ -130,11 +130,11 @@ class UtilitiesETL:
                         if records:
                             logger.info(f"Successfully parsed {len(records)} records from {pdf_path}")
                             df = pd.DataFrame(records)
-                            df['fecha'] = date.today()
+                            df["fecha"] = date.today()
                             return df
                     except Exception as e:
                         logger.warning(f"Failed to parse {pdf_path}: {e}")
-            
+
             # Fallback a histórico verificado
             today = date.today()
             data = []
@@ -142,14 +142,16 @@ class UtilitiesETL:
                 if producto_key in TARIFF_HISTORY:
                     history = TARIFF_HISTORY[producto_key]
                     latest = history[-1]
-                    data.append({
-                        "producto": producto_key,
-                        "fecha": today,
-                        "valor": latest["valor"],
-                        "fuente": "URSEA - Historical (verified)",
-                        "ultima_verificacion": latest["fecha"],
-                    })
-            
+                    data.append(
+                        {
+                            "producto": producto_key,
+                            "fecha": today,
+                            "valor": latest["valor"],
+                            "fuente": "URSEA - Historical (verified)",
+                            "ultima_verificacion": latest["fecha"],
+                        }
+                    )
+
             df = pd.DataFrame(data)
             logger.info(f"Using historical UTE data ({len(df)} records)")
             return df
@@ -161,10 +163,10 @@ class UtilitiesETL:
     async def extract_ose_tarifas(self) -> Optional[pd.DataFrame]:
         """
         Extrae tarifas de OSE desde histórico verificado.
-        
+
         Fuente: URSEA (Régimen Tarifario para OSE)
         Última actualización: Dic 2024
-        
+
         Nota: OSE expone data limitada; mantener con histórico actualizado mensualmente.
         """
         try:
@@ -177,13 +179,15 @@ class UtilitiesETL:
                 if producto_key in TARIFF_HISTORY:
                     history = TARIFF_HISTORY[producto_key]
                     latest = history[-1]
-                    data.append({
-                        "producto": producto_key,
-                        "fecha": today,
-                        "valor": latest["valor"],
-                        "fuente": "URSEA - Historical (verified)",
-                        "ultima_verificacion": latest["fecha"],
-                    })
+                    data.append(
+                        {
+                            "producto": producto_key,
+                            "fecha": today,
+                            "valor": latest["valor"],
+                            "fuente": "URSEA - Historical (verified)",
+                            "ultima_verificacion": latest["fecha"],
+                        }
+                    )
 
             df = pd.DataFrame(data)
             logger.info(f"Using OSE historical data ({len(df)} records)")
@@ -196,10 +200,10 @@ class UtilitiesETL:
     async def extract_antel_tarifas(self) -> Optional[pd.DataFrame]:
         """
         Extrae tarifas de Antel desde histórico verificado.
-        
+
         Fuente: URSEA (Régimen Tarifario para Servicios de Telecomunicaciones)
         Última actualización: Dic 2024
-        
+
         Nota: Antel publica data mínimamente; mantener con histórico actualizado mensualmente.
         """
         try:
@@ -212,13 +216,15 @@ class UtilitiesETL:
                 if producto_key in TARIFF_HISTORY:
                     history = TARIFF_HISTORY[producto_key]
                     latest = history[-1]
-                    data.append({
-                        "producto": producto_key,
-                        "fecha": today,
-                        "valor": latest["valor"],
-                        "fuente": "URSEA - Historical (verified)",
-                        "ultima_verificacion": latest["fecha"],
-                    })
+                    data.append(
+                        {
+                            "producto": producto_key,
+                            "fecha": today,
+                            "valor": latest["valor"],
+                            "fuente": "URSEA - Historical (verified)",
+                            "ultima_verificacion": latest["fecha"],
+                        }
+                    )
 
             df = pd.DataFrame(data)
             logger.info(f"Using Antel historical data ({len(df)} records)")
@@ -284,7 +290,7 @@ class UtilitiesETL:
 
         latest = history[-1]["valor"]
         previous = history[-2]["valor"]
-        
+
         variation_pesos = latest - previous
         variation_percent = (variation_pesos / previous * 100) if previous != 0 else 0
 

@@ -2,12 +2,13 @@
 Sistema de alertas para ETL
 Notifica sobre fallos, registros no cargados, etc.
 """
+
 import logging
-from datetime import datetime
-from typing import Dict, Any, Optional
 import smtplib
-from email.mime.text import MIMEText
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import Any, Dict, Optional
 
 from app.core.config import settings
 
@@ -81,9 +82,7 @@ class ETLAlert:
 
         return True
 
-    def alert_etl_failure(
-        self, etl_name: str, exception: Exception, execution_time: float
-    ) -> None:
+    def alert_etl_failure(self, etl_name: str, exception: Exception, execution_time: float) -> None:
         """Alerta de fallo en ETL"""
         self.send_alert(
             alert_type=self.ALERT_ETL_FAILURE,
@@ -96,9 +95,7 @@ class ETLAlert:
             severity="error",
         )
 
-    def alert_no_records_loaded(
-        self, etl_name: str, records_extracted: int, execution_time: float
-    ) -> None:
+    def alert_no_records_loaded(self, etl_name: str, records_extracted: int, execution_time: float) -> None:
         """Alerta cuando se extraen registros pero no se carga ninguno"""
         self.send_alert(
             alert_type=self.ALERT_NO_RECORDS,

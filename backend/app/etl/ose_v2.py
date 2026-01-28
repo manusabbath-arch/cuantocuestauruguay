@@ -99,14 +99,15 @@ class OSEETLv2(ETLBase):
                 if producto_key in self.TARIFF_HISTORY:
                     history = self.TARIFF_HISTORY[producto_key]
                     latest = history[-1]
-                    data.append({
-                        "producto": producto_key,
-                        "display_name": display_name,
-                        "fecha": today,
-                        "valor": latest["valor"],
-                        "fuente": "Histórico URSEA (Verificado)",
-                        "ultima_verificacion": latest["fecha"],
-                    })
+                    data.append(
+                        {
+                            "producto": producto_key,
+                            "fecha": today,
+                            "valor": latest["valor"],
+                            "fuente": "Histórico URSEA (Verificado)",
+                            "ultima_verificacion": latest["fecha"],
+                        }
+                    )
 
             df = pd.DataFrame(data)
             logger.info(f"Extracted {len(df)} OSE tariffs from verified history")
@@ -186,14 +187,10 @@ class OSEETLv2(ETLBase):
 
             for _, row in data.iterrows():
                 producto_key = row["producto"]
-                display_name = self.PRODUCTOS_MAP.get(
-                    producto_key, producto_key
-                )
+                display_name = self.PRODUCTOS_MAP.get(producto_key, producto_key)
 
                 # Ensure Producto exists
-                producto = self.db_session.query(Producto).filter_by(
-                    nombre=display_name
-                ).first()
+                producto = self.db_session.query(Producto).filter_by(nombre=display_name).first()
 
                 if not producto:
                     logger.info(f"Creating new Producto: {display_name}")

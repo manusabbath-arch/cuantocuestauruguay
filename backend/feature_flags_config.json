@@ -1,0 +1,26 @@
+{
+  "combustibles": {
+    "name": "combustibles",
+    "phase": "canary",
+    "enabled": true,
+    "v2_percentage": 10
+  },
+  "ute": {
+    "name": "ute",
+    "phase": "canary",
+    "enabled": true,
+    "v2_percentage": 10
+  },
+  "ose": {
+    "name": "ose",
+    "phase": "canary",
+    "enabled": true,
+    "v2_percentage": 10
+  },
+  "antel": {
+    "name": "antel",
+    "phase": "canary",
+    "enabled": true,
+    "v2_percentage": 10
+  }
+}

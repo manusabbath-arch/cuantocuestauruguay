@@ -17,10 +17,18 @@ class Settings(BaseSettings):
 
     # CORS - Parse from comma-separated string or list
     # Valores por defecto apuntan a dominios productivos; sobrescribir en .env para dev
-    CORS_ORIGINS: str = "https://cuantocuestauruguay.com,https://www.cuantocuestauruguay.com"
+    # En desarrollo: CORS_ORIGINS="http://localhost:5173,http://localhost:3000"
+    CORS_ORIGINS: str = "https://cuantocuestauruguay.com,https://www.cuantocuestauruguay.com,http://localhost:5173"
+
+    # Security headers
+    SECURE_HEADERS_ENABLED: bool = True
+    HSTS_MAX_AGE: int = 31536000  # 1 year
+    HSTS_INCLUDE_SUBDOMAINS: bool = True
 
     # Database
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/preciosregulados"
+    # SQLite para desarrollo, PostgreSQL para producción (sobrescribir en .env)
+    DATABASE_URL: str = "sqlite:///./preciosregulados.db"
+    # DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/preciosregulados"
 
     # CKAN API
     CKAN_API_URL: str = "https://catalogodatos.gub.uy/api/3/action"
@@ -32,7 +40,7 @@ class Settings(BaseSettings):
 
     # Rate limiting
     RATE_LIMIT_GENERAL: int = 60  # requests/min
-    RATE_LIMIT_ETL: int = 5       # requests/min para /api/v1/etl/*
+    RATE_LIMIT_ETL: int = 5  # requests/min para /api/v1/etl/*
 
     # Sentry
     SENTRY_DSN: str = ""

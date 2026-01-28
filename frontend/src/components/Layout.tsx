@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { TrendingUp } from 'lucide-react'
+import { trackEvent } from '../lib/analytics'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -18,14 +19,20 @@ export default function Layout({ children }: LayoutProps) {
             </Link>
             
             <nav className="hidden md:flex items-center gap-6">
-              <Link to="/" className="text-gray-600 hover:text-primary transition-colors">
+              <Link to="/" className="text-gray-600 hover:text-primary transition-colors" onClick={() => trackEvent('nav_click', { to: '/' })}>
                 Inicio
               </Link>
-              <Link to="/comparador" className="text-gray-600 hover:text-primary transition-colors">
+              <Link to="/servicios" className="text-gray-600 hover:text-primary transition-colors" onClick={() => trackEvent('nav_click', { to: '/servicios' })}>
+                Servicios
+              </Link>
+              <Link to="/comparador" className="text-gray-600 hover:text-primary transition-colors" onClick={() => trackEvent('nav_click', { to: '/comparador' })}>
                 Comparador
               </Link>
-              <Link to="/about" className="text-gray-600 hover:text-primary transition-colors">
-                Acerca de
+              <Link to="/sobre-nosotros" className="text-gray-600 hover:text-primary transition-colors" onClick={() => trackEvent('nav_click', { to: '/sobre-nosotros' })}>
+                Sobre Nosotros
+              </Link>
+              <Link to="/contacto" className="text-gray-600 hover:text-primary transition-colors" onClick={() => trackEvent('nav_click', { to: '/contacto' })}>
+                Contacto
               </Link>
             </nav>
           </div>

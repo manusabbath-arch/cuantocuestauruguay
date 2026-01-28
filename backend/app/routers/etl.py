@@ -7,60 +7,101 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
-from app.etl.combustibles_v2 import CombustiblesETLv2
-from app.etl.utilities import UtilitiesETL, TARIFF_HISTORY
-from app.services.shadow_mode import ShadowModeExecutor, shadow_log_repo
+from app.core.feature_flags import RolloutPhase, feature_flags
 from app.etl.alerts import alert_manager
+from app.etl.antel_v2 import AntelETLv2
+from app.etl.combustibles_v2 import CombustiblesETLv2
+from app.etl.ose_v2 import OSEETLv2
+from app.etl.ute_v2 import UTEETLv2
+from app.etl.utilities import TARIFF_HISTORY, UtilitiesETL
 from app.models.models import Precio, Producto
 from app.scheduler import scheduler
+from app.services.shadow_mode import ShadowModeExecutor, shadow_log_repo
 
 router = APIRouter(prefix="/api/v1/etl", tags=["etl"])
 
 
 @router.post("/run")
-async def ejecutar_etl(shadow_mode: bool = False, db: Session = Depends(get_db)):
-    """Ejecuta el proceso ETL de combustibles manualmente (opcional shadow mode)."""
+async def ejecutar_etl(shadow_mode: bool = False, user_id: Optional[str] = None, db: Session = Depends(get_db)):
+    """Ejecuta el proceso ETL de combustibles manualmente.
+
+    Si shadow_mode=true, ejecuta v1 y v2 en paralelo.
+    Si no, usa feature flags para determinar si usar v1 o v2.
+    """
     try:
+        flag = feature_flags.get("combustibles")
+
         if shadow_mode:
             executor = ShadowModeExecutor(db)
             return await executor.run_shadow("combustibles")
 
+        # Determinar versión basada en feature flag
+        use_v2 = flag.route_to_v2(user_id) if flag else False
+
+        if use_v2:
+            etl = CombustiblesETLv2(db)
+            result = await run_in_threadpool(etl.run)
+            return {"source": "v2", **result}
+
+        # Fallback a v1 (CombustiblesETLv2 es el único disponible en routers)
         etl = CombustiblesETLv2(db)
-        # CombustiblesETLv2 es sincrónico (hereda de ETLBase); usar threadpool
         result = await run_in_threadpool(etl.run)
-        return result
+        return {"source": "v1", **result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error ejecutando ETL: {str(e)}")
 
 
 @router.post("/utilities/run")
-async def ejecutar_utilities_etl(service: Optional[str] = None, shadow_mode: bool = False, db: Session = Depends(get_db)):
+async def ejecutar_utilities_etl(
+    service: Optional[str] = None,
+    shadow_mode: bool = False,
+    user_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
     """
-    Ejecuta el proceso ETL de servicios públicos (UTE, OSE, Antel)
+    Ejecuta el proceso ETL de servicios públicos (UTE, OSE, Antel).
+
+    Soporta feature flags y shadow mode.
 
     Args:
         service: Opcional - específica el servicio ('ute', 'ose', 'antel').
                  Si no se especifica, ejecuta todos.
+        shadow_mode: Si True, ejecuta v1 y v2 en paralelo.
+        user_id: Para feature flag routing (determinístico por user).
     """
     try:
-        etl = UtilitiesETL(db)
-
         if service:
             service = service.lower()
+            if service not in {"ute", "ose", "antel"}:
+                raise HTTPException(status_code=400, detail=f"Servicio no válido: {service}. Opciones: ute, ose, antel")
+
             if shadow_mode:
                 executor = ShadowModeExecutor(db)
-                if service not in {"ute", "ose", "antel"}:
-                    raise HTTPException(status_code=400, detail=f"Servicio no válido: {service}. Opciones: ute, ose, antel")
-                result = await executor.run_shadow(service)
-            else:
+                return await executor.run_shadow(service)
+
+            # Feature flag routing
+            flag = feature_flags.get(service)
+            use_v2 = flag.route_to_v2(user_id) if flag else False
+
+            if use_v2:
                 if service == "ute":
-                    result = await etl.run_ute()
+                    etl = UTEETLv2(db)
                 elif service == "ose":
-                    result = await etl.run_ose()
+                    etl = OSEETLv2(db)
                 elif service == "antel":
-                    result = await etl.run_antel()
-                else:
-                    raise HTTPException(status_code=400, detail=f"Servicio no válido: {service}. Opciones: ute, ose, antel")
+                    etl = AntelETLv2(db)
+                result = await etl.run()
+                return {"source": "v2", **result}
+
+            # V1 fallback
+            util = UtilitiesETL(db)
+            if service == "ute":
+                result = await util.run_ute()
+            elif service == "ose":
+                result = await util.run_ose()
+            elif service == "antel":
+                result = await util.run_antel()
+            return {"source": "v1", **result}
         else:
             if shadow_mode:
                 executor = ShadowModeExecutor(db)
@@ -69,10 +110,12 @@ async def ejecutar_utilities_etl(service: Optional[str] = None, shadow_mode: boo
                     "ose": await executor.run_shadow("ose"),
                     "antel": await executor.run_shadow("antel"),
                 }
+                return result
             else:
-                result = await etl.run_all()
+                util = UtilitiesETL(db)
+                result = await util.run_all()
+                return result
 
-        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -107,18 +150,20 @@ async def obtener_estado():
                 "scheduler_running": False,
                 "message": "Scheduler is not running",
             }
-        
+
         jobs = scheduler.get_jobs()
         jobs_info = []
-        
+
         for job in jobs:
-            jobs_info.append({
-                "id": job.id,
-                "name": job.name,
-                "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
-                "trigger": str(job.trigger),
-            })
-        
+            jobs_info.append(
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
+                    "trigger": str(job.trigger),
+                }
+            )
+
         return {
             "scheduler_running": True,
             "jobs": jobs_info,
@@ -134,10 +179,10 @@ async def obtener_estadisticas_bd(db: Session = Depends(get_db)):
     try:
         # Contar productos por categoría
         productos_count = db.query(Producto.categoria, func.count(Producto.id)).group_by(Producto.categoria).all()
-        
+
         # Contar precios totales
         precios_total = db.query(func.count(Precio.id)).scalar()
-        
+
         # Contar precios por producto (top 10)
         precios_por_producto = (
             db.query(Producto.nombre, func.count(Precio.id))
@@ -146,7 +191,7 @@ async def obtener_estadisticas_bd(db: Session = Depends(get_db)):
             .limit(10)
             .all()
         )
-        
+
         return {
             "productos_por_categoria": dict(productos_count),
             "total_precios": precios_total,
@@ -162,7 +207,7 @@ async def obtener_alertas_etl():
     try:
         summary = alert_manager.get_alert_summary()
         recent = alert_manager.get_recent_alerts(limit=20)
-        
+
         return {
             "summary": summary,
             "recent_alerts": recent,
@@ -222,15 +267,15 @@ async def obtener_variaciones_tarifas():
     """
     etl = UtilitiesETL(None)
     variations = {}
-    
+
     for producto_key in TARIFF_HISTORY.keys():
         var = etl.calculate_variation(producto_key)
         if var:
             variations[producto_key] = var
-    
+
     return {
         "variations": variations,
-        "timestamp": str(__import__('datetime').datetime.now().isoformat()),
+        "timestamp": str(__import__("datetime").datetime.now().isoformat()),
     }
 
 
@@ -238,14 +283,11 @@ async def obtener_variaciones_tarifas():
 async def obtener_historico_producto(producto_key: str):
     """Obtiene el histórico de un producto específico"""
     if producto_key not in TARIFF_HISTORY:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Producto '{producto_key}' no encontrado en histórico"
-        )
-    
+        raise HTTPException(status_code=404, detail=f"Producto '{producto_key}' no encontrado en histórico")
+
     etl = UtilitiesETL(None)
     variation = etl.calculate_variation(producto_key)
-    
+
     return {
         "producto": producto_key,
         "historia": TARIFF_HISTORY[producto_key],
@@ -264,3 +306,41 @@ async def obtener_shadow_logs(limit: int = 50):
         "logs": [asdict(entry) for entry in sliced],
     }
 
+
+@router.get("/feature-flags")
+async def obtener_feature_flags():
+    """Devuelve el estado actual de todos los feature flags."""
+    flags = feature_flags.list_all()
+    return {
+        "flags": {name: flag.dict() for name, flag in flags.items()},
+        "description": "Feature flags para control de v1/v2 rollout",
+    }
+
+
+@router.post("/feature-flags/{etl_name}")
+async def actualizar_feature_flag(
+    etl_name: str,
+    phase: Optional[RolloutPhase] = None,
+    percentage: Optional[int] = None,
+):
+    """Actualiza el feature flag de un ETL específico."""
+    if etl_name not in {"combustibles", "ute", "ose", "antel"}:
+        raise HTTPException(status_code=400, detail=f"ETL desconocido: {etl_name}")
+
+    if phase:
+        feature_flags.set_phase(etl_name, phase)
+        if phase in (RolloutPhase.CANARY, RolloutPhase.GRADUAL):
+            feature_flags.enable_v2(etl_name)
+        elif phase == RolloutPhase.FULL:
+            feature_flags.enable_v2(etl_name)
+        elif phase == RolloutPhase.DISABLED:
+            feature_flags.disable_v2(etl_name)
+
+    if percentage is not None:
+        feature_flags.set_percentage(etl_name, percentage)
+
+    flag = feature_flags.get(etl_name)
+    return {
+        "etl": etl_name,
+        "updated": flag.dict() if flag else None,
+    }

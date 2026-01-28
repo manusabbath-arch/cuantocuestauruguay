@@ -11,12 +11,11 @@ Use cases:
 import asyncio
 import logging
 import time
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
-
-from pathlib import Path
 
 from app.services.shadow_mode_logs import ShadowModeLogRepository
 
@@ -41,9 +40,7 @@ class ShadowModeExecutor:
         etl_v1, etl_v2 = self._get_etl_pair(etl_name)
 
         # Run both ETLs concurrently
-        v1_result, v2_result = await asyncio.gather(
-            self._safe_run(etl_v1), self._safe_run(etl_v2)
-        )
+        v1_result, v2_result = await asyncio.gather(self._safe_run(etl_v1), self._safe_run(etl_v2))
 
         comparison = self.compare_results(v1_result, v2_result)
 
@@ -52,9 +49,7 @@ class ShadowModeExecutor:
         if comparison["match"]:
             logger.info("Shadow mode matched for %s", etl_name)
         else:
-            logger.warning(
-                "Shadow mode discrepancy for %s: %s", etl_name, comparison["differences"]
-            )
+            logger.warning("Shadow mode discrepancy for %s: %s", etl_name, comparison["differences"])
 
         # Return v1 response to avoid impacting users
         return {
@@ -141,24 +136,24 @@ class ShadowModeExecutor:
             return CombustiblesETL(self.db_session), CombustiblesETLv2(self.db_session)
 
         if etl_name == "ute":
-            from app.etl.utilities import UtilitiesETL
             from app.etl.ute_v2 import UTEETLv2
+            from app.etl.utilities import UtilitiesETL
 
             util = UtilitiesETL(self.db_session)
             v1_runner = self._wrap_utilities_method(util.run_ute)
             return v1_runner, UTEETLv2(self.db_session)
 
         if etl_name == "ose":
-            from app.etl.utilities import UtilitiesETL
             from app.etl.ose_v2 import OSEETLv2
+            from app.etl.utilities import UtilitiesETL
 
             util = UtilitiesETL(self.db_session)
             v1_runner = self._wrap_utilities_method(util.run_ose)
             return v1_runner, OSEETLv2(self.db_session)
 
         if etl_name == "antel":
-            from app.etl.utilities import UtilitiesETL
             from app.etl.antel_v2 import AntelETLv2
+            from app.etl.utilities import UtilitiesETL
 
             util = UtilitiesETL(self.db_session)
             v1_runner = self._wrap_utilities_method(util.run_antel)

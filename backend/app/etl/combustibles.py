@@ -164,20 +164,14 @@ class CombustiblesETL:
                     fecha = row["fecha"]
                     precio = row["precio"]
 
-                    producto = (
-                        self.db.query(Producto)
-                        .filter(Producto.nombre == producto_nombre)
-                        .first()
-                    )
+                    producto = self.db.query(Producto).filter(Producto.nombre == producto_nombre).first()
 
                     if not producto:
                         logger.warning(f"Product not found: {producto_nombre}")
                         continue
 
                     exists = (
-                        self.db.query(Precio)
-                        .filter(Precio.producto_id == producto.id, Precio.fecha == fecha)
-                        .first()
+                        self.db.query(Precio).filter(Precio.producto_id == producto.id, Precio.fecha == fecha).first()
                     )
 
                     if exists:
@@ -211,23 +205,19 @@ class CombustiblesETL:
         """Asegura que los productos básicos existen en la base de datos"""
         created = 0
         existing_count = 0
-        
+
         for nombre in self.PRODUCTOS_MAP.values():
             existing = self.db.query(Producto).filter(Producto.nombre == nombre).first()
 
             if not existing:
-                nuevo_producto = Producto(
-                    nombre=nombre, categoria="combustible", unidad="litro", activo=True
-                )
+                nuevo_producto = Producto(nombre=nombre, categoria="combustible", unidad="litro", activo=True)
                 self.db.add(nuevo_producto)
                 created += 1
             else:
                 existing_count += 1
 
         self.db.commit()
-        logger.info(
-            f"_ensure_productos: Created {created}, Already existing {existing_count}"
-        )
+        logger.info(f"_ensure_productos: Created {created}, Already existing {existing_count}")
 
     async def run(self) -> Dict[str, any]:
         """Ejecuta el pipeline ETL completo"""
