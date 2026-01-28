@@ -24,7 +24,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.etl.pdf_parser import list_pdfs_in_directory, parse_ute_tariff_pdf
+from app.etl.pdf_parser import list_pdfs_in_directory, parse_ose_tariff_pdf, parse_ute_tariff_pdf
 from app.models.models import Precio, Producto
 
 logger = logging.getLogger(__name__)
@@ -162,7 +162,7 @@ class UtilitiesETL:
 
     async def extract_ose_tarifas(self) -> Optional[pd.DataFrame]:
         """
-        Extrae tarifas de OSE desde histórico verificado.
+        Extrae tarifas de OSE desde PDF local o histórico verificado.
 
         Fuente: URSEA (Régimen Tarifario para OSE)
         Última actualización: Dic 2024
@@ -170,7 +170,24 @@ class UtilitiesETL:
         Nota: OSE expone data limitada; mantener con histórico actualizado mensualmente.
         """
         try:
-            logger.info("Extracting OSE tarifas from verified history")
+            logger.info("Extracting OSE tarifas from PDF or verified history")
+
+            # Intentar parsear PDF local primero
+            pdf_dir = "backend/pdfs/ose"
+            pdfs = list_pdfs_in_directory(pdf_dir)
+
+            if pdfs:
+                logger.info(f"Found {len(pdfs)} OSE PDF(s), attempting parse...")
+                for pdf_path in pdfs:
+                    try:
+                        records = parse_ose_tariff_pdf(pdf_path)
+                        if records:
+                            logger.info(f"Successfully parsed {len(records)} records from {pdf_path}")
+                            df = pd.DataFrame(records)
+                            df["fecha"] = date.today()
+                            return df
+                    except Exception as e:
+                        logger.warning(f"Failed to parse {pdf_path}: {e}")
 
             today = date.today()
             data = []
@@ -313,6 +330,20 @@ class UtilitiesETL:
             # Asegurar que la fecha está en formato correcto
             if "fecha" in df.columns:
                 df["fecha"] = pd.to_datetime(df["fecha"]).dt.date
+
+            # Parsear valor_str si viene de PDF
+            if "valor_str" in df.columns and "valor" not in df.columns:
+                def parse_valor(val_str):
+                    if pd.isna(val_str):
+                        return None
+                    clean = str(val_str).replace("$", "").replace("UYU", "").strip()
+                    clean = clean.replace(",", ".")
+                    try:
+                        return float(clean)
+                    except ValueError:
+                        return None
+
+                df["valor"] = df["valor_str"].apply(parse_valor)
 
             # Validar valores numéricos
             if "valor" in df.columns:

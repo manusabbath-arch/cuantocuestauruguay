@@ -16,6 +16,7 @@ actualizado mensualmente desde fuentes URSEA verificadas.
 
 import logging
 import sys
+import time
 from datetime import date
 from pathlib import Path
 from typing import Optional
@@ -28,6 +29,7 @@ sys.path.insert(0, str(backend_path))
 
 # Imports de la app
 from app.core.config import settings
+from app.etl.pdf_parser import list_pdfs_in_directory, parse_ose_tariff_pdf
 from app.models.models import Precio, Producto
 from packages.etl_core import ETLBase
 
@@ -60,18 +62,22 @@ class OSEETLv2(ETLBase):
     }
 
     # Histórico verificado de tarifas (fuente URSEA)
+    # Actualizado: Enero 2026
+    # Fuente: https://www.ursea.gub.uy/inicio/agua-y-saneamiento/tarifas/
     TARIFF_HISTORY = {
         "OSE_RESIDENCIAL": [
-            {"fecha": "2024-12-01", "valor": 12.50},
-            {"fecha": "2024-11-01", "valor": 12.35},
-            {"fecha": "2024-10-01", "valor": 12.20},
-            {"fecha": "2024-09-01", "valor": 12.05},
+            {"fecha": "2026-01-28", "valor": 47.60},  # Enero 2026
+            {"fecha": "2025-12-01", "valor": 45.50},  # Dic 2025
+            {"fecha": "2025-11-01", "valor": 44.00},  # Nov 2025
+            {"fecha": "2025-10-01", "valor": 42.50},  # Oct 2025
+            {"fecha": "2025-09-01", "valor": 41.25},  # Sep 2025
         ],
         "OSE_COMERCIAL": [
-            {"fecha": "2024-12-01", "valor": 13.20},
-            {"fecha": "2024-11-01", "valor": 13.05},
-            {"fecha": "2024-10-01", "valor": 12.90},
-            {"fecha": "2024-09-01", "valor": 12.75},
+            {"fecha": "2026-01-28", "valor": 88.25},  # Enero 2026
+            {"fecha": "2025-12-01", "valor": 85.00},  # Dic 2025
+            {"fecha": "2025-11-01", "valor": 82.50},  # Nov 2025
+            {"fecha": "2025-10-01", "valor": 80.00},  # Oct 2025
+            {"fecha": "2025-09-01", "valor": 77.50},  # Sep 2025
         ],
     }
 
@@ -81,7 +87,7 @@ class OSEETLv2(ETLBase):
 
     def extract(self) -> Optional[pd.DataFrame]:
         """
-        Extract OSE tariffs from verified historical data.
+        Extract OSE tariffs from PDF or verified historical data.
 
         Note: OSE exposes limited public data, so we use verified historical records
         from URSEA that are updated monthly.
@@ -89,9 +95,27 @@ class OSEETLv2(ETLBase):
         Returns:
             pd.DataFrame with columns: producto, fecha, valor, fuente, ultima_verificacion
         """
-        logger.info("Starting OSE extract from verified history")
+        logger.info("Starting OSE extract from PDF or verified history")
 
         try:
+            # Intentar parsear PDF local primero
+            pdf_dir = "backend/pdfs/ose"
+            pdfs = list_pdfs_in_directory(pdf_dir)
+
+            if pdfs:
+                logger.info(f"Found {len(pdfs)} OSE PDF(s), attempting parse...")
+                for pdf_path in pdfs:
+                    try:
+                        records = parse_ose_tariff_pdf(pdf_path)
+                        if records:
+                            logger.info(f"Successfully parsed {len(records)} records from {pdf_path}")
+                            df = pd.DataFrame(records)
+                            df["fecha"] = date.today()
+                            df["fuente"] = "PDF Local (URSEA)"
+                            return df
+                    except Exception as e:
+                        logger.warning(f"Failed to parse {pdf_path}: {e}")
+
             today = date.today()
             data = []
 
@@ -140,6 +164,20 @@ class OSEETLv2(ETLBase):
 
             # Normalize column names
             df.columns = df.columns.str.lower()
+
+            # Map PDF parser columns to expected format
+            if "valor_str" in df.columns and "valor" not in df.columns:
+                def parse_valor(val_str):
+                    if pd.isna(val_str):
+                        return None
+                    clean = str(val_str).replace("$", "").replace("UYU", "").strip()
+                    clean = clean.replace(",", ".")
+                    try:
+                        return float(clean)
+                    except ValueError:
+                        return None
+
+                df["valor"] = df["valor_str"].apply(parse_valor)
 
             # Parse fecha column
             if "fecha" in df.columns:
@@ -196,11 +234,22 @@ class OSEETLv2(ETLBase):
                     logger.info(f"Creating new Producto: {display_name}")
                     producto = Producto(
                         nombre=display_name,
-                        categoria="Agua",
-                        supplier="OSE",
+                        categoria="agua",
+                        unidad="m³",
+                        activo=True,
                     )
                     self.db_session.add(producto)
                     self.db_session.flush()
+
+                # Avoid duplicates (producto_id + fecha)
+                existing = (
+                    self.db_session.query(Precio)
+                    .filter_by(producto_id=producto.id, fecha=row["fecha"])
+                    .first()
+                )
+                if existing:
+                    logger.info(f"Skipping existing price for {display_name} on {row['fecha']}")
+                    continue
 
                 # Insert Precio
                 precio = Precio(
@@ -208,10 +257,6 @@ class OSEETLv2(ETLBase):
                     valor=float(row["valor"]),
                     fecha=row["fecha"],
                     fuente=row.get("fuente", "OSE ETL v2"),
-                    metadata={
-                        "producto_key": producto_key,
-                        "ultima_verificacion": row.get("ultima_verificacion"),
-                    },
                 )
                 self.db_session.add(precio)
                 inserted += 1
@@ -232,6 +277,7 @@ class OSEETLv2(ETLBase):
             dict with execution status and metrics
         """
         logger.info("Starting OSE ETL v2 execution")
+        start = time.monotonic()
 
         try:
             # Extract
@@ -251,7 +297,7 @@ class OSEETLv2(ETLBase):
                 "success": True,
                 "name": self.name,
                 "records_processed": len(cleaned_data),
-                "duration_seconds": self.duration_seconds,
+                "duration_seconds": time.monotonic() - start,
                 "errors": [],
             }
 
@@ -264,6 +310,6 @@ class OSEETLv2(ETLBase):
                 "success": False,
                 "name": self.name,
                 "records_processed": 0,
-                "duration_seconds": self.duration_seconds,
+                "duration_seconds": time.monotonic() - start,
                 "errors": [str(e)],
             }
