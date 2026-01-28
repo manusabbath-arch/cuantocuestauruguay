@@ -22,9 +22,15 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from twilio.rest import Client
-
 logger = logging.getLogger(__name__)
+
+# Twilio es opcional - graceful fallback
+try:
+    from twilio.rest import Client
+    TWILIO_AVAILABLE = True
+except ImportError:
+    TWILIO_AVAILABLE = False
+    Client = None
 
 
 class WhatsAppBot:
@@ -36,7 +42,7 @@ class WhatsAppBot:
         self.auth_token = os.getenv("TWILIO_AUTH_TOKEN")
         self.phone_number = os.getenv("TWILIO_PHONE_NUMBER", "whatsapp:+1234567890")
         
-        if self.account_sid and self.auth_token:
+        if self.account_sid and self.auth_token and TWILIO_AVAILABLE:
             self.client = Client(self.account_sid, self.auth_token)
         else:
             logger.warning("Twilio credentials not configured. Bot in demo mode.")
