@@ -172,6 +172,31 @@ class UTEETLv2(ETLBase):
             # Normalize column names
             df.columns = df.columns.str.lower()
 
+            # Map PDF parser columns to expected format
+            # PDF parser returns: nombre, valor_str
+            # We need: producto, valor
+            if "nombre" in df.columns and "producto" not in df.columns:
+                df["producto"] = df["nombre"]
+                logger.debug("Mapped 'nombre' → 'producto'")
+
+            if "valor_str" in df.columns and "valor" not in df.columns:
+                # Parse valor_str to numeric
+                # Handle formats like "8.50", "8,50", "$8.50", etc.
+                def parse_valor(val_str):
+                    if pd.isna(val_str):
+                        return None
+                    # Remove currency symbols and whitespace
+                    clean = str(val_str).replace("$", "").replace("UYU", "").strip()
+                    # Replace comma with dot (Uruguayan format)
+                    clean = clean.replace(",", ".")
+                    try:
+                        return float(clean)
+                    except ValueError:
+                        return None
+
+                df["valor"] = df["valor_str"].apply(parse_valor)
+                logger.debug("Parsed 'valor_str' → 'valor'")
+
             # Parse fecha column
             if "fecha" in df.columns:
                 df["fecha"] = pd.to_datetime(df["fecha"]).dt.date
@@ -183,17 +208,17 @@ class UTEETLv2(ETLBase):
             required = ["producto", "valor", "fecha"]
             missing = [col for col in required if col not in df.columns]
             if missing:
-                raise ValueError(f"Missing required columns: {missing}")
+                raise ValueError(f"Missing required columns: {missing}. Available: {df.columns.tolist()}")
 
-            # Validate valor is numeric
+            # Validate valor is numeric and positive
             df["valor"] = pd.to_numeric(df["valor"], errors="coerce")
+            df = df[df["valor"] > 0]  # Remove invalid/negative values
             df = df.dropna(subset=["valor"])
 
-            # Remove rows with invalid products
-            valid_productos = set(self.PRODUCTOS_MAP.keys())
-            df = df[df["producto"].isin(valid_productos)]
+            # Note: Not filtering by PRODUCTOS_MAP because PDF contains many tariff types
+            # Load() will create productos dynamically as needed
 
-            logger.info(f"Transformed {len(df)} UTE tariff records")
+            logger.info(f"Transformed {len(df)} UTE tariff records (from {len(data)} raw)")
             return df
 
         except Exception as e:
@@ -227,25 +252,36 @@ class UTEETLv2(ETLBase):
                     logger.info(f"Creating new Producto: {display_name}")
                     producto = Producto(
                         nombre=display_name,
-                        categoria="Electricidad",
-                        supplier="UTE",
+                        categoria="Servicios Públicos - Electricidad",
+                        unidad="$/kWh",
                     )
                     self.db_session.add(producto)
                     self.db_session.flush()
 
-                # Insert Precio
-                precio = Precio(
-                    producto_id=producto.id,
-                    valor=float(row["valor"]),
-                    fecha=row["fecha"],
-                    fuente=row.get("fuente", "UTE ETL v2"),
-                    metadata={
-                        "producto_key": producto_key,
-                        "ultima_verificacion": row.get("ultima_verificacion"),
-                    },
+                # Check if price already exists for this date
+                existing = (
+                    self.db_session.query(Precio)
+                    .filter(Precio.producto_id == producto.id, Precio.fecha == row["fecha"])
+                    .first()
                 )
-                self.db_session.add(precio)
-                inserted += 1
+
+                if existing:
+                    # Update if different
+                    if abs(float(existing.valor) - float(row["valor"])) > 0.01:
+                        existing.valor = float(row["valor"])
+                        existing.fuente = row.get("fuente", "UTE ETL v2")
+                        self.db_session.add(existing)
+                        logger.debug(f"Updated {display_name} price for {row['fecha']}")
+                else:
+                    # Insert new price
+                    precio = Precio(
+                        producto_id=producto.id,
+                        valor=float(row["valor"]),
+                        fecha=row["fecha"],
+                        fuente=row.get("fuente", "UTE ETL v2"),
+                    )
+                    self.db_session.add(precio)
+                    inserted += 1
 
             self.db_session.commit()
             logger.info(f"Successfully loaded {inserted} UTE tariff records")
@@ -255,46 +291,4 @@ class UTEETLv2(ETLBase):
             logger.error(f"Error loading UTE data: {e}")
             raise
 
-    async def run(self):
-        """
-        Execute full UTE ETL pipeline.
-
-        Returns:
-            dict with execution status and metrics
-        """
-        logger.info("Starting UTE ETL v2 execution")
-
-        try:
-            # Extract
-            raw_data = self.extract()
-            if raw_data is None or raw_data.empty:
-                raise ValueError("No UTE data extracted")
-
-            # Transform
-            cleaned_data = self.transform(raw_data)
-            if cleaned_data.empty:
-                raise ValueError("No valid UTE data after transform")
-
-            # Load
-            self.load(cleaned_data)
-
-            result = {
-                "success": True,
-                "name": self.name,
-                "records_processed": len(cleaned_data),
-                "duration_seconds": self.duration_seconds,
-                "errors": [],
-            }
-
-            logger.info(f"UTE ETL v2 completed successfully: {result}")
-            return result
-
-        except Exception as e:
-            logger.error(f"UTE ETL v2 failed: {e}")
-            return {
-                "success": False,
-                "name": self.name,
-                "records_processed": 0,
-                "duration_seconds": self.duration_seconds,
-                "errors": [str(e)],
-            }
+    # Note: run() method is inherited from ETLBase and calls extract(), transform(), load() automatically
