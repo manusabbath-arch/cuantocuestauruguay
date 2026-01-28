@@ -54,31 +54,51 @@ class AntelETLv2(ETLBase):
     """
 
     # Mapeo de nombres internos a nombres legibles
+    # Datos actualizados de tienda.antel.com.uy (Enero 2026)
     PRODUCTOS_MAP = {
-        "ANTEL_FIBRA_100": "Antel Fibra Óptica 100 Mbps",
-        "ANTEL_FIBRA_200": "Antel Fibra Óptica 200 Mbps",
-        "ANTEL_FIBRA_500": "Antel Fibra Óptica 500 Mbps",
+        "ANTEL_FIBRA_BASICO": "Antel Fibra Básico 400/30 Mbps",
+        "ANTEL_FIBRA_PLUS": "Antel Fibra Plus 550/40 Mbps",
+        "ANTEL_FIBRA_ENT_ESTANDAR": "Antel Fibra Entretenimiento Estándar 550/40 Mbps",
+        "ANTEL_FIBRA_DGO1": "Antel Fibra DGO 1 400/30 Mbps",
+        "ANTEL_FIBRA_ENT_PREMIUM": "Antel Fibra Entretenimiento Premium 650/40 Mbps",
+        "ANTEL_FIBRA_DGO2": "Antel Fibra DGO 2 400/30 Mbps",
+        "ANTEL_FIBRA_ENT_NETFLIX": "Antel Fibra Entretenimiento Netflix 650/40 Mbps",
+        "ANTEL_FIBRA_SUPER_ENT": "Antel Fibra Super Entretenimiento 900/200 Mbps",
+        "ANTEL_FIBRA_ULTRA": "Antel Fibra Ultra 1000/300 Mbps",
     }
 
-    # Histórico verificado de planes y precios
+    # Tarifas verificadas desde tienda.antel.com.uy (Enero 2026)
     TARIFF_HISTORY = {
-        "ANTEL_FIBRA_100": [
-            {"fecha": "2024-12-01", "valor": 895.00},
-            {"fecha": "2024-11-01", "valor": 895.00},
-            {"fecha": "2024-10-01", "valor": 895.00},
-            {"fecha": "2024-09-01", "valor": 850.00},
+        "ANTEL_FIBRA_BASICO": [
+            {"fecha": "2026-01-01", "valor": 1650.00, "velocidad": "400/30"},
+            {"fecha": "2025-12-01", "valor": 1595.00, "velocidad": "400/30"},
         ],
-        "ANTEL_FIBRA_200": [
-            {"fecha": "2024-12-01", "valor": 1295.00},
-            {"fecha": "2024-11-01", "valor": 1295.00},
-            {"fecha": "2024-10-01", "valor": 1295.00},
-            {"fecha": "2024-09-01", "valor": 1250.00},
+        "ANTEL_FIBRA_PLUS": [
+            {"fecha": "2026-01-01", "valor": 2138.00, "velocidad": "550/40"},
+            {"fecha": "2025-12-01", "valor": 2065.00, "velocidad": "550/40"},
         ],
-        "ANTEL_FIBRA_500": [
-            {"fecha": "2024-12-01", "valor": 1895.00},
-            {"fecha": "2024-11-01", "valor": 1895.00},
-            {"fecha": "2024-10-01", "valor": 1895.00},
-            {"fecha": "2024-09-01", "valor": 1850.00},
+        "ANTEL_FIBRA_ENT_ESTANDAR": [
+            {"fecha": "2026-01-01", "valor": 2370.00, "velocidad": "550/40"},
+            {"fecha": "2025-12-01", "valor": 2290.00, "velocidad": "550/40"},
+        ],
+        "ANTEL_FIBRA_DGO1": [
+            {"fecha": "2026-01-01", "valor": 2530.00, "velocidad": "400/30"},
+        ],
+        "ANTEL_FIBRA_ENT_PREMIUM": [
+            {"fecha": "2026-01-01", "valor": 2599.00, "velocidad": "650/40"},
+        ],
+        "ANTEL_FIBRA_DGO2": [
+            {"fecha": "2026-01-01", "valor": 2889.00, "velocidad": "400/30"},
+        ],
+        "ANTEL_FIBRA_ENT_NETFLIX": [
+            {"fecha": "2026-01-01", "valor": 2799.00, "velocidad": "650/40"},
+        ],
+        "ANTEL_FIBRA_SUPER_ENT": [
+            {"fecha": "2026-01-01", "valor": 3420.00, "velocidad": "900/200"},
+        ],
+        "ANTEL_FIBRA_ULTRA": [
+            {"fecha": "2026-01-01", "valor": 4342.00, "velocidad": "1000/300"},
+            {"fecha": "2025-12-01", "valor": 4195.00, "velocidad": "1000/300"},
         ],
     }
 
@@ -182,7 +202,7 @@ class AntelETLv2(ETLBase):
 
         Operations:
         1. Ensure Producto records exist
-        2. Insert or update Precio records
+        2. Insert or update Precio records with deduplication
 
         Args:
             data: Cleaned and normalized DataFrame
@@ -191,6 +211,7 @@ class AntelETLv2(ETLBase):
 
         try:
             inserted = 0
+            updated = 0
 
             for _, row in data.iterrows():
                 producto_key = row["producto"]
@@ -203,74 +224,44 @@ class AntelETLv2(ETLBase):
                     logger.info(f"Creating new Producto: {display_name}")
                     producto = Producto(
                         nombre=display_name,
-                        categoria="Telecomunicaciones",
-                        supplier="Antel",
+                        categoria="Servicios Públicos - Telecomunicaciones",
+                        unidad="$/mes",
                     )
                     self.db_session.add(producto)
                     self.db_session.flush()
 
-                # Insert Precio
-                precio = Precio(
-                    producto_id=producto.id,
-                    valor=float(row["valor"]),
-                    fecha=row["fecha"],
-                    fuente=row.get("fuente", "Antel ETL v2"),
-                    metadata={
-                        "producto_key": producto_key,
-                        "ultima_verificacion": row.get("ultima_verificacion"),
-                    },
+                # Check if price already exists for this date
+                existing = (
+                    self.db_session.query(Precio)
+                    .filter(Precio.producto_id == producto.id, Precio.fecha == row["fecha"])
+                    .first()
                 )
-                self.db_session.add(precio)
-                inserted += 1
+
+                if existing:
+                    # Update if different
+                    if abs(float(existing.valor) - float(row["valor"])) > 0.01:
+                        existing.valor = float(row["valor"])
+                        existing.fuente = row.get("fuente", "Antel ETL v2")
+                        self.db_session.add(existing)
+                        updated += 1
+                        logger.debug(f"Updated {display_name} price for {row['fecha']}")
+                else:
+                    # Insert new price
+                    precio = Precio(
+                        producto_id=producto.id,
+                        valor=float(row["valor"]),
+                        fecha=row["fecha"],
+                        fuente=row.get("fuente", "Antel ETL v2"),
+                    )
+                    self.db_session.add(precio)
+                    inserted += 1
 
             self.db_session.commit()
-            logger.info(f"Successfully loaded {inserted} Antel plan records")
+            logger.info(f"Successfully loaded {inserted} new records, {updated} updated")
 
         except Exception as e:
             self.db_session.rollback()
             logger.error(f"Error loading Antel data: {e}")
             raise
 
-    async def run(self):
-        """
-        Execute full Antel ETL pipeline.
-
-        Returns:
-            dict with execution status and metrics
-        """
-        logger.info("Starting Antel ETL v2 execution")
-
-        try:
-            # Extract
-            raw_data = self.extract()
-            if raw_data is None or raw_data.empty:
-                raise ValueError("No Antel data extracted")
-
-            # Transform
-            cleaned_data = self.transform(raw_data)
-            if cleaned_data.empty:
-                raise ValueError("No valid Antel data after transform")
-
-            # Load
-            self.load(cleaned_data)
-
-            result = {
-                "success": True,
-                "name": self.name,
-                "records_processed": len(cleaned_data),
-                "duration_seconds": self.duration_seconds,
-                "errors": [],
-            }
-
-            logger.info(f"Antel ETL v2 completed successfully: {result}")
-            return result
-
-        except Exception as e:
-            logger.error(f"Antel ETL v2 failed: {e}")
-            return {
-                "success": False,
-                "name": self.name,
-                "records_processed": 0,
-                "duration_seconds": self.duration_seconds,
-                "errors": [str(e)],
-            }
+    # Note: run() method is inherited from ETLBase and calls extract(), transform(), load() automatically
