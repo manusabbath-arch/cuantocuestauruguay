@@ -92,49 +92,125 @@ def parse_ute_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
     """
     Parse UTE tariff PDF and extract tariff data.
 
-    Attempts to find tariff table and extract structured data.
-    Expected columns: Tariff name, Rate ($/kWh), Effective date
+    This parser is designed for "Pliego Tarifario" documents from UTE
+    that contain actual electricity tariff rates by category (BT1, BT2, etc.).
+
+    Expected table structure:
+    - Column 1: Tariff category (e.g., "Residencial BT1", "Comercial BT3")
+    - Column 2+: Rate values ($/kWh)
+
+    Keywords that indicate a valid tariff table:
+    - Strict: "BT1", "BT2", "BT3", "MT", "AT" (voltage categories)
+    - Medium: "residencial", "comercial", "industrial"
+    - Weak: "$/kWh", "precio", "tarifa"
 
     Args:
-        pdf_path: Path to UTE tariff PDF
+        pdf_path: Path to UTE tariff PDF (ideally "Pliego Tarifario")
 
     Returns:
-        List of extracted tariff records with keys: nombre, valor, fecha
-    """
-    tables = None
+        List of extracted tariff records with keys: nombre, valor_str, fecha, fuente
+        Returns None if no valid tariff table is found
 
+    Note:
+        Financial documents (e.g., "Escenarios de Aumento") will be rejected
+        as they don't contain actual tariff rates by category.
+    """
     try:
         with pdfplumber.open(pdf_path) as pdf:
+            logger.info(f"Parsing UTE PDF: {Path(pdf_path).name} ({len(pdf.pages)} pages)")
+
             # Try multiple pages (tariffs often span pages)
             for page_idx, page_obj in enumerate(pdf.pages):
                 tables = page_obj.extract_tables()
-                if tables:
-                    for table_idx, table in enumerate(tables):
-                        if table and len(table) > 1:
-                            # Check if this looks like a tariff table
-                            # Look for columns with "tariff", "rate", "$", "kWh"
-                            flat_headers = " ".join(str(h) for h in table[0]).lower()
-                            if any(x in flat_headers for x in ["tarifa", "tariff", "tasa", "rate", "kwh", "$"]):
-                                logger.info(f"Found potential tariff table on page {page_idx}, table {table_idx}")
-                                records = []
-                                for row in table[1:]:
-                                    if row and len(row) >= 2:
-                                        # Simple heuristic: first col = name, second col = value
-                                        records.append(
-                                            {
-                                                "nombre": str(row[0]).strip(),
-                                                "valor_str": str(row[1]).strip(),
-                                                "fecha": date.today(),
-                                                "fuente": f"PDF: {Path(pdf_path).name}",
-                                            }
-                                        )
-                                if records:
-                                    return records
+                if not tables:
+                    continue
+
+                for table_idx, table in enumerate(tables):
+                    if not table or len(table) < 3:  # Need at least header + 2 data rows
+                        continue
+
+                    # Extract headers and flatten to string
+                    headers = table[0] if table else []
+                    flat_headers = " ".join(str(h).lower() for h in headers if h)
+
+                    # STRICT VALIDATION: Must contain voltage category keywords
+                    strict_keywords = ["bt1", "bt2", "bt3", "mt", "at"]
+                    has_strict = any(kw in flat_headers for kw in strict_keywords)
+
+                    # MEDIUM VALIDATION: Customer type keywords
+                    medium_keywords = ["residencial", "comercial", "industrial"]
+                    has_medium = any(kw in flat_headers for kw in medium_keywords)
+
+                    # WEAK VALIDATION: Generic tariff keywords
+                    weak_keywords = ["$/kwh", "precio", "kwh"]
+                    has_weak = any(kw in flat_headers for kw in weak_keywords)
+
+                    # REJECTION FILTERS: Financial/non-tariff tables
+                    reject_keywords = ["ingresos", "egresos", "deficit", "superavit",
+                                     "escenario", "miles de pesos", "cobertura", "caja"]
+                    is_rejected = any(kw in flat_headers for kw in reject_keywords)
+
+                    if is_rejected:
+                        logger.debug(f"Page {page_idx}, Table {table_idx}: Rejected (financial document)")
+                        continue
+
+                    # Score-based validation (need at least medium + weak, or strict alone)
+                    score = (has_strict * 3) + (has_medium * 2) + (has_weak * 1)
+                    if score < 3:
+                        logger.debug(f"Page {page_idx}, Table {table_idx}: Score {score}/3 too low")
+                        continue
+
+                    logger.info(f"Found valid tariff table on page {page_idx}, table {table_idx} (score: {score})")
+
+                    # Extract tariff records
+                    records = []
+                    for row_idx, row in enumerate(table[1:], 1):
+                        if not row or len(row) < 2:
+                            continue
+
+                        # Get tariff name (first column)
+                        nombre = str(row[0]).strip()
+
+                        # Skip empty rows or subtotals
+                        if not nombre or nombre.lower() in ["", "total", "subtotal", "none"]:
+                            continue
+
+                        # Skip rows that are clearly not tariffs
+                        skip_patterns = ["ingresos", "egresos", "ventas", "deficit",
+                                       "superavit", "saldo", "compromiso", "deuda"]
+                        if any(pattern in nombre.lower() for pattern in skip_patterns):
+                            continue
+
+                        # Get price value (second column, or search for numeric)
+                        valor_str = None
+                        for cell in row[1:]:
+                            cell_str = str(cell).strip()
+                            # Look for numeric values (with dots, commas, or $)
+                            if cell_str and any(c.isdigit() for c in cell_str):
+                                valor_str = cell_str
+                                break
+
+                        if not valor_str:
+                            logger.debug(f"Row {row_idx}: No price value found for '{nombre}'")
+                            continue
+
+                        records.append({
+                            "nombre": nombre,
+                            "valor_str": valor_str,
+                            "fecha": date.today(),
+                            "fuente": f"PDF: {Path(pdf_path).name}",
+                        })
+
+                    if records:
+                        logger.info(f"Extracted {len(records)} tariff records from page {page_idx}")
+                        return records
+
+            logger.warning(f"No valid tariff tables found in {Path(pdf_path).name}")
+            return None
 
     except Exception as e:
-        logger.error(f"Error parsing UTE tariff PDF {pdf_path}: {e}")
-
-    return None
+        logger.error(f"Error parsing UTE tariff PDF {pdf_path}: {e}", exc_info=True)
+        return None
 
 
 def list_pdfs_in_directory(dir_path: str) -> List[str]:
