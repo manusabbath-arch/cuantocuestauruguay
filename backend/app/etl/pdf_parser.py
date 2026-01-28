@@ -11,6 +11,7 @@ This module focuses on parsing already-downloaded PDFs.
 """
 
 import logging
+import re
 from datetime import date
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -119,6 +120,9 @@ def parse_ute_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
         with pdfplumber.open(pdf_path) as pdf:
             logger.info(f"Parsing UTE PDF: {Path(pdf_path).name} ({len(pdf.pages)} pages)")
 
+            all_records = []
+            min_score_threshold = 6  # Only accumulate tables with score >= 6 (high quality)
+
             # Try multiple pages (tariffs often span pages)
             for page_idx, page_obj in enumerate(pdf.pages):
                 tables = page_obj.extract_tables()
@@ -145,6 +149,11 @@ def parse_ute_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
                     weak_keywords = ["$/kwh", "precio", "kwh"]
                     has_weak = any(kw in flat_headers for kw in weak_keywords)
 
+                    # BONUS: First column is "Tarifa" (indicates tariff codes table)
+                    first_col = str(headers[0]).lower() if headers else ""
+                    has_tarifa_col = "tarifa" in first_col
+                    bonus_score = 5 if has_tarifa_col else 0
+
                     # REJECTION FILTERS: Financial/non-tariff tables
                     reject_keywords = ["ingresos", "egresos", "deficit", "superavit",
                                      "escenario", "miles de pesos", "cobertura", "caja"]
@@ -154,13 +163,30 @@ def parse_ute_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
                         logger.debug(f"Page {page_idx}, Table {table_idx}: Rejected (financial document)")
                         continue
 
-                    # Score-based validation (need at least medium + weak, or strict alone)
-                    score = (has_strict * 3) + (has_medium * 2) + (has_weak * 1)
+                    # Score-based validation (need at least medium + weak, or strict alone, or tarifa column)
+                    score = (has_strict * 3) + (has_medium * 2) + (has_weak * 1) + bonus_score
                     if score < 3:
                         logger.debug(f"Page {page_idx}, Table {table_idx}: Score {score}/3 too low")
                         continue
 
                     logger.info(f"Found valid tariff table on page {page_idx}, table {table_idx} (score: {score})")
+
+                    # Identify price column by analyzing headers
+                    price_col_indices = []
+                    for col_idx, header in enumerate(headers[1:], 1):  # Skip first column (tariff name)
+                        header_lower = str(header).lower() if header else ""
+
+                        # Skip voltage/tension columns
+                        if any(kw in header_lower for kw in ["tensión", "tension", "kv", "nivel"]):
+                            continue
+
+                        # Prioritize price/energy columns
+                        if any(kw in header_lower for kw in ["precio", "$/kwh", "kwh", "punta", "valle", "llano"]):
+                            price_col_indices.append(col_idx)
+
+                    # If no explicit price columns, use all numeric columns (fallback)
+                    if not price_col_indices:
+                        price_col_indices = list(range(1, len(headers)))
 
                     # Extract tariff records
                     records = []
@@ -177,18 +203,25 @@ def parse_ute_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
 
                         # Skip rows that are clearly not tariffs
                         skip_patterns = ["ingresos", "egresos", "ventas", "deficit",
-                                       "superavit", "saldo", "compromiso", "deuda"]
+                                       "superavit", "saldo", "compromiso", "deuda",
+                                       "lunes", "martes", "miércoles", "jueves", "viernes",
+                                       "sábado", "domingo", "feriado", "días de"]
                         if any(pattern in nombre.lower() for pattern in skip_patterns):
                             continue
 
-                        # Get price value (second column, or search for numeric)
+                        # Get price value from identified price columns
                         valor_str = None
-                        for cell in row[1:]:
-                            cell_str = str(cell).strip()
-                            # Look for numeric values (with dots, commas, or $)
-                            if cell_str and any(c.isdigit() for c in cell_str):
-                                valor_str = cell_str
-                                break
+                        for col_idx in price_col_indices:
+                            if col_idx < len(row):
+                                cell_str = str(row[col_idx]).strip()
+                                # Look for numeric values (with dots, commas, or $)
+                                # Exclude voltage patterns (ranges with dash)
+                                if cell_str and any(c.isdigit() for c in cell_str):
+                                    # Skip if it's a voltage range (e.g., "0,230 - 0,400")
+                                    if " - " in cell_str and "," in cell_str.split(" - ")[0]:
+                                        continue
+                                    valor_str = cell_str
+                                    break
 
                         if not valor_str:
                             logger.debug(f"Row {row_idx}: No price value found for '{nombre}'")
@@ -202,8 +235,15 @@ def parse_ute_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
                         })
 
                     if records:
-                        logger.info(f"Extracted {len(records)} tariff records from page {page_idx}")
-                        return records
+                        logger.info(f"Extracted {len(records)} tariff records from page {page_idx}, table {table_idx}")
+
+                        # Accumulate all tables with high score (>= threshold)
+                        if score >= min_score_threshold:
+                            all_records.extend(records)
+
+            if all_records:
+                logger.info(f"Total extracted: {len(all_records)} tariff records from {len(set(r['nombre'] for r in all_records))} unique tariffs")
+                return all_records
 
             logger.warning(f"No valid tariff tables found in {Path(pdf_path).name}")
             return None
@@ -212,6 +252,119 @@ def parse_ute_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
         logger.error(f"Error parsing UTE tariff PDF {pdf_path}: {e}", exc_info=True)
         return None
 
+
+def _parse_decimal(value: str) -> Optional[float]:
+    if value is None:
+        return None
+    clean = str(value).replace("$", "").replace("UYU", "").replace(" ", "")
+    clean = clean.replace(".", "").replace(",", ".")
+    try:
+        return float(clean)
+    except ValueError:
+        return None
+
+
+def parse_ose_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
+    """
+    Parse OSE tariff PDF and extract residential/commercial water tariffs.
+
+    Expected to find rows mentioning "Residencial" and/or "Comercial" with
+    values in $/m³ or similar notation. The parser is heuristic and falls back
+    to text search when tables are not detected.
+
+    Returns:
+        List of extracted tariff records with keys: producto, valor_str, fecha, fuente
+    """
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            logger.info(f"Parsing OSE PDF: {Path(pdf_path).name} ({len(pdf.pages)} pages)")
+
+            for page_idx, page_obj in enumerate(pdf.pages):
+                tables = page_obj.extract_tables() or []
+
+                for table_idx, table in enumerate(tables):
+                    if not table or len(table) < 2:
+                        continue
+
+                    records = []
+                    for row in table[1:]:
+                        if not row:
+                            continue
+
+                        row_text = " ".join(str(cell) for cell in row if cell)
+                        row_lower = row_text.lower()
+
+                        producto_key = None
+                        if "residencial" in row_lower:
+                            producto_key = "OSE_RESIDENCIAL"
+                        elif "comercial" in row_lower or "no residencial" in row_lower:
+                            producto_key = "OSE_COMERCIAL"
+
+                        if not producto_key:
+                            continue
+
+                        numeric_cells = [cell for cell in row if cell and re.search(r"\d", str(cell))]
+                        valor_str = None
+                        for cell in numeric_cells:
+                            candidate = str(cell)
+                            if re.search(r"\d+[\.,]\d+", candidate) or re.search(r"\d{2,}", candidate):
+                                valor_str = candidate
+                                break
+
+                        if not valor_str:
+                            continue
+
+                        records.append(
+                            {
+                                "producto": producto_key,
+                                "valor_str": valor_str,
+                                "fecha": date.today(),
+                                "fuente": f"PDF: {Path(pdf_path).name}",
+                            }
+                        )
+
+                    if records:
+                        logger.info(
+                            f"Extracted {len(records)} OSE tariff records from page {page_idx}, table {table_idx}"
+                        )
+                        return records
+
+                # Fallback: parse text if no tables
+                page_text = page_obj.extract_text() or ""
+                if page_text:
+                    candidates = []
+                    for line in page_text.splitlines():
+                        line_lower = line.lower()
+                        producto_key = None
+                        if "residencial" in line_lower:
+                            producto_key = "OSE_RESIDENCIAL"
+                        elif "comercial" in line_lower or "no residencial" in line_lower:
+                            producto_key = "OSE_COMERCIAL"
+
+                        if not producto_key:
+                            continue
+
+                        match = re.search(r"(\d+[\.,]\d+)", line)
+                        if match:
+                            candidates.append(
+                                {
+                                    "producto": producto_key,
+                                    "valor_str": match.group(1),
+                                    "fecha": date.today(),
+                                    "fuente": f"PDF: {Path(pdf_path).name}",
+                                }
+                            )
+
+                    if candidates:
+                        logger.info(f"Extracted {len(candidates)} OSE tariff records from text on page {page_idx}")
+                        return candidates
+
+            logger.warning(f"No valid OSE tariff data found in {Path(pdf_path).name}")
+            return None
+
+    except Exception as e:
+        logger.error(f"Error parsing OSE tariff PDF {pdf_path}: {e}", exc_info=True)
+        return None
 
 def list_pdfs_in_directory(dir_path: str) -> List[str]:
     """
