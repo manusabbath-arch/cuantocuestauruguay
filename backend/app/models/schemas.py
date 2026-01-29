@@ -38,7 +38,6 @@ class PrecioCreate(PrecioBase):
 
 class PrecioResponse(PrecioBase):
     id: int
-    created_at: Optional[date] = None
 
     class Config:
         from_attributes = True

@@ -333,6 +333,7 @@ class UtilitiesETL:
 
             # Parsear valor_str si viene de PDF
             if "valor_str" in df.columns and "valor" not in df.columns:
+
                 def parse_valor(val_str):
                     if pd.isna(val_str):
                         return None

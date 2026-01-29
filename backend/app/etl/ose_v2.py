@@ -167,6 +167,7 @@ class OSEETLv2(ETLBase):
 
             # Map PDF parser columns to expected format
             if "valor_str" in df.columns and "valor" not in df.columns:
+
                 def parse_valor(val_str):
                     if pd.isna(val_str):
                         return None
@@ -242,11 +243,7 @@ class OSEETLv2(ETLBase):
                     self.db_session.flush()
 
                 # Avoid duplicates (producto_id + fecha)
-                existing = (
-                    self.db_session.query(Precio)
-                    .filter_by(producto_id=producto.id, fecha=row["fecha"])
-                    .first()
-                )
+                existing = self.db_session.query(Precio).filter_by(producto_id=producto.id, fecha=row["fecha"]).first()
                 if existing:
                     logger.info(f"Skipping existing price for {display_name} on {row['fecha']}")
                     continue

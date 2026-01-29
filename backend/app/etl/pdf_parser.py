@@ -155,8 +155,16 @@ def parse_ute_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
                     bonus_score = 5 if has_tarifa_col else 0
 
                     # REJECTION FILTERS: Financial/non-tariff tables
-                    reject_keywords = ["ingresos", "egresos", "deficit", "superavit",
-                                     "escenario", "miles de pesos", "cobertura", "caja"]
+                    reject_keywords = [
+                        "ingresos",
+                        "egresos",
+                        "deficit",
+                        "superavit",
+                        "escenario",
+                        "miles de pesos",
+                        "cobertura",
+                        "caja",
+                    ]
                     is_rejected = any(kw in flat_headers for kw in reject_keywords)
 
                     if is_rejected:
@@ -202,10 +210,25 @@ def parse_ute_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
                             continue
 
                         # Skip rows that are clearly not tariffs
-                        skip_patterns = ["ingresos", "egresos", "ventas", "deficit",
-                                       "superavit", "saldo", "compromiso", "deuda",
-                                       "lunes", "martes", "miércoles", "jueves", "viernes",
-                                       "sábado", "domingo", "feriado", "días de"]
+                        skip_patterns = [
+                            "ingresos",
+                            "egresos",
+                            "ventas",
+                            "deficit",
+                            "superavit",
+                            "saldo",
+                            "compromiso",
+                            "deuda",
+                            "lunes",
+                            "martes",
+                            "miércoles",
+                            "jueves",
+                            "viernes",
+                            "sábado",
+                            "domingo",
+                            "feriado",
+                            "días de",
+                        ]
                         if any(pattern in nombre.lower() for pattern in skip_patterns):
                             continue
 
@@ -227,12 +250,14 @@ def parse_ute_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
                             logger.debug(f"Row {row_idx}: No price value found for '{nombre}'")
                             continue
 
-                        records.append({
-                            "nombre": nombre,
-                            "valor_str": valor_str,
-                            "fecha": date.today(),
-                            "fuente": f"PDF: {Path(pdf_path).name}",
-                        })
+                        records.append(
+                            {
+                                "nombre": nombre,
+                                "valor_str": valor_str,
+                                "fecha": date.today(),
+                                "fuente": f"PDF: {Path(pdf_path).name}",
+                            }
+                        )
 
                     if records:
                         logger.info(f"Extracted {len(records)} tariff records from page {page_idx}, table {table_idx}")
@@ -242,7 +267,9 @@ def parse_ute_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
                             all_records.extend(records)
 
             if all_records:
-                logger.info(f"Total extracted: {len(all_records)} tariff records from {len(set(r['nombre'] for r in all_records))} unique tariffs")
+                logger.info(
+                    f"Total extracted: {len(all_records)} tariff records from {len(set(r['nombre'] for r in all_records))} unique tariffs"
+                )
                 return all_records
 
             logger.warning(f"No valid tariff tables found in {Path(pdf_path).name}")
@@ -365,6 +392,7 @@ def parse_ose_tariff_pdf(pdf_path: str) -> Optional[List[Dict]]:
     except Exception as e:
         logger.error(f"Error parsing OSE tariff PDF {pdf_path}: {e}", exc_info=True)
         return None
+
 
 def list_pdfs_in_directory(dir_path: str) -> List[str]:
     """

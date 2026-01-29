@@ -17,16 +17,17 @@ Instalación:
   TWILIO_PHONE_NUMBER=+1234567890
 """
 
-import os
 import logging
-from typing import Optional, Dict, Any
+import os
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 # Twilio es opcional - graceful fallback
 try:
     from twilio.rest import Client
+
     TWILIO_AVAILABLE = True
 except ImportError:
     TWILIO_AVAILABLE = False
@@ -41,7 +42,7 @@ class WhatsAppBot:
         self.account_sid = os.getenv("TWILIO_ACCOUNT_SID")
         self.auth_token = os.getenv("TWILIO_AUTH_TOKEN")
         self.phone_number = os.getenv("TWILIO_PHONE_NUMBER", "whatsapp:+1234567890")
-        
+
         if self.account_sid and self.auth_token and TWILIO_AVAILABLE:
             self.client = Client(self.account_sid, self.auth_token)
         else:
@@ -51,11 +52,11 @@ class WhatsAppBot:
     def handle_message(self, user_id: str, message: str) -> str:
         """
         Procesar mensaje del usuario
-        
+
         Args:
             user_id: Número de WhatsApp del usuario
             message: Texto del mensaje
-            
+
         Returns:
             Respuesta a enviar
         """
@@ -161,11 +162,11 @@ Contacto: https://cuantocuestauruguay.com/contacto
     def send_message(self, user_id: str, message: str) -> bool:
         """
         Enviar mensaje vía Twilio
-        
+
         Args:
             user_id: Número de WhatsApp (con formato: +598...)
             message: Texto a enviar
-            
+
         Returns:
             True si fue exitoso
         """
@@ -188,7 +189,7 @@ Contacto: https://cuantocuestauruguay.com/contacto
     def setup_webhook(self) -> Dict[str, str]:
         """
         Configuración para webhook de Twilio
-        
+
         Retorna instrucciones para configurar en panel Twilio
         """
         return {

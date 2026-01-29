@@ -10,11 +10,11 @@ Setup:
   RESEND_API_KEY=re_...
 """
 
-import os
-from typing import Optional, List
-from datetime import datetime
-from dataclasses import dataclass
 import json
+import os
+from dataclasses import dataclass
+from datetime import datetime
+from typing import List, Optional
 
 # Para demo, usamos un JSON file. En prod, usar Resend API
 SUBSCRIBERS_FILE = "backend/data/newsletter_subscribers.json"
@@ -23,6 +23,7 @@ SUBSCRIBERS_FILE = "backend/data/newsletter_subscribers.json"
 @dataclass
 class Subscriber:
     """Modelo de suscriptor"""
+
     email: str
     name: Optional[str] = None
     subscribed_at: str = None
@@ -44,7 +45,7 @@ class NewsletterManager:
         self.api_key = os.getenv("RESEND_API_KEY")
         self.from_email = "newsletter@cuantocuestauruguay.com"
         self.from_name = "PreciosRegulados.uy"
-        
+
         # Para demo, usar archivo JSON
         self.use_api = bool(self.api_key)
         self._ensure_data_file()
@@ -53,10 +54,10 @@ class NewsletterManager:
         """Crear archivo de suscriptores si no existe"""
         import os
         from pathlib import Path
-        
+
         data_dir = Path("backend/data")
         data_dir.mkdir(exist_ok=True)
-        
+
         if not Path(SUBSCRIBERS_FILE).exists():
             with open(SUBSCRIBERS_FILE, "w") as f:
                 json.dump({"subscribers": []}, f)
@@ -64,17 +65,17 @@ class NewsletterManager:
     def subscribe(self, email: str, name: str = None, tags: List[str] = None) -> bool:
         """
         Suscribir usuario a newsletter
-        
+
         Args:
             email: Email del usuario
             name: Nombre (opcional)
             tags: Tags para segmentación (default: ["newsletter"])
-            
+
         Returns:
             True si fue exitoso
         """
         subscriber = Subscriber(email=email, name=name, tags=tags or ["newsletter"])
-        
+
         if self.use_api:
             return self._subscribe_via_api(subscriber)
         else:
@@ -85,22 +86,24 @@ class NewsletterManager:
         try:
             with open(SUBSCRIBERS_FILE, "r") as f:
                 data = json.load(f)
-            
+
             # Verificar si ya existe
             if any(s["email"] == subscriber.email for s in data["subscribers"]):
                 return False  # Ya existe
-            
-            data["subscribers"].append({
-                "email": subscriber.email,
-                "name": subscriber.name,
-                "subscribed_at": subscriber.subscribed_at,
-                "tags": subscriber.tags,
-                "active": subscriber.active,
-            })
-            
+
+            data["subscribers"].append(
+                {
+                    "email": subscriber.email,
+                    "name": subscriber.name,
+                    "subscribed_at": subscriber.subscribed_at,
+                    "tags": subscriber.tags,
+                    "active": subscriber.active,
+                }
+            )
+
             with open(SUBSCRIBERS_FILE, "w") as f:
                 json.dump(data, f, indent=2)
-            
+
             return True
         except Exception as e:
             print(f"Error subscribing: {e}")
@@ -110,8 +113,9 @@ class NewsletterManager:
         """Suscribir via Resend API"""
         try:
             import resend
+
             resend.api_key = self.api_key
-            
+
             resend.Contacts.create(
                 email=subscriber.email,
                 list_id="cuantocuestauruguay",
@@ -126,10 +130,10 @@ class NewsletterManager:
     def send_weekly_digest(self, template: str = "default") -> dict:
         """
         Enviar digest semanal de precios
-        
+
         Args:
             template: Nombre del template
-            
+
         Returns:
             Estadísticas de envío
         """
@@ -142,9 +146,9 @@ class NewsletterManager:
         """Demo de digest sin enviar realmente"""
         with open(SUBSCRIBERS_FILE, "r") as f:
             data = json.load(f)
-        
+
         count = len(data["subscribers"])
-        
+
         return {
             "status": "success",
             "message": f"Newsletter digest would be sent to {count} subscribers",
@@ -157,18 +161,19 @@ class NewsletterManager:
         """Enviar via Resend API"""
         try:
             import resend
+
             resend.api_key = self.api_key
-            
+
             # Template: resumen semanal de precios
             html = self._get_weekly_digest_html()
-            
+
             email = resend.Emails.send(
                 from_=f"{self.from_name} <{self.from_email}>",
                 to="cuantocuestauruguay@resend.dev",  # Test
                 subject="📊 Resumen Semanal de Precios (Sem. 4 Enero)",
                 html=html,
             )
-            
+
             return {
                 "status": "success",
                 "email_id": email["id"],
@@ -247,10 +252,10 @@ class NewsletterManager:
         """Obtener estadísticas del newsletter"""
         with open(SUBSCRIBERS_FILE, "r") as f:
             data = json.load(f)
-        
+
         subscribers = data.get("subscribers", [])
         active = sum(1 for s in subscribers if s.get("active", True))
-        
+
         return {
             "total_subscribers": len(subscribers),
             "active_subscribers": active,
@@ -262,12 +267,12 @@ class NewsletterManager:
 def demo():
     """Demo de newsletter"""
     mgr = NewsletterManager()
-    
+
     print("=" * 80)
     print("📧 Newsletter Manager - Demo")
     print("=" * 80)
     print()
-    
+
     # Subscribe
     print("1️⃣ Suscribiendo usuarios...")
     mgr.subscribe("usuario1@example.com", "Juan")
@@ -275,21 +280,21 @@ def demo():
     mgr.subscribe("usuario3@example.com", "Carlos")
     print("   ✅ 3 usuarios suscritos")
     print()
-    
+
     # Stats
     print("2️⃣ Estadísticas:")
     stats = mgr.get_stats()
     for key, value in stats.items():
         print(f"   {key}: {value}")
     print()
-    
+
     # Send digest
     print("3️⃣ Enviando digest semanal...")
     result = mgr.send_weekly_digest()
     for key, value in result.items():
         print(f"   {key}: {value}")
     print()
-    
+
     print("✅ Demo completado")
 
 
