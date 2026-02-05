@@ -37,24 +37,25 @@ export default function RecommendationCard({ recomendacion }: RecommendationCard
   const Icon = config.icon
 
   return (
-    <div className={`${config.bgColor} border ${config.borderColor} rounded-lg p-5`}>
-      <div className="flex items-start gap-4">
+    <div className={`${config.bgColor} border ${config.borderColor} rounded-lg p-4 sm:p-5`}>
+      <div className="flex items-start gap-3 sm:gap-4">
         <div className={`flex-shrink-0 mt-0.5 ${config.iconColor}`}>
-          <Icon className="w-6 h-6" />
+          <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
         </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <h4 className="font-semibold text-gray-900">{recomendacion.titulo}</h4>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <h4 className="font-semibold text-gray-900 text-sm sm:text-base">{recomendacion.titulo}</h4>
             <span className={`text-xs px-2 py-0.5 rounded-full ${config.badgeColor}`}>
               {config.badgeText}
             </span>
           </div>
-          <p className="text-sm text-gray-700 leading-relaxed">{recomendacion.descripcion}</p>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{recomendacion.descripcion}</p>
           {recomendacion.ahorro_estimado != null && recomendacion.ahorro_estimado > 0 && (
-            <div className="mt-3 flex items-center gap-2">
-              <Lightbulb className="w-4 h-4 text-green-600" />
+            <div className="mt-2 sm:mt-3 flex items-center gap-2 bg-green-100/50 rounded-md px-3 py-1.5">
+              <Lightbulb className="w-4 h-4 text-green-600 flex-shrink-0" />
               <span className="text-sm font-medium text-green-700">
                 Ahorro estimado: ${recomendacion.ahorro_estimado.toLocaleString('es-UY')}/mes
+                <span className="text-green-600 font-normal"> (${(recomendacion.ahorro_estimado * 12).toLocaleString('es-UY')}/año)</span>
               </span>
             </div>
           )}
