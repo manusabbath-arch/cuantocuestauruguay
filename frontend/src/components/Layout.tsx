@@ -25,6 +25,9 @@ export default function Layout({ children }: LayoutProps) {
               <Link to="/servicios" className="text-gray-600 hover:text-primary transition-colors" onClick={() => trackEvent('nav_click', { to: '/servicios' })}>
                 Servicios
               </Link>
+              <Link to="/mi-factura" className="text-blue-600 hover:text-blue-800 font-medium transition-colors" onClick={() => trackEvent('nav_click', { to: '/mi-factura' })}>
+                Mi Factura
+              </Link>
               <Link to="/comparador" className="text-gray-600 hover:text-primary transition-colors" onClick={() => trackEvent('nav_click', { to: '/comparador' })}>
                 Comparador
               </Link>

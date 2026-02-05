@@ -10,6 +10,7 @@ import Contacto from './pages/Contacto'
 import { useEffect } from 'react'
 import { trackPageview } from './lib/analytics'
 import PrecioNaftaHoy from './pages/PrecioNaftaHoy'
+import MiFactura from './pages/MiFactura'
 
 function App() {
   const location = useLocation()
@@ -29,6 +30,7 @@ function App() {
         <Route path="/sobre-nosotros" element={<SobreNosotros />} />
         <Route path="/contacto" element={<Contacto />} />
         <Route path="/precio-nafta-hoy" element={<PrecioNaftaHoy />} />
+        <Route path="/mi-factura" element={<MiFactura />} />
       </Routes>
     </Layout>
   )

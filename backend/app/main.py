@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.middleware.security import setup_security_middleware
-from app.routers import etl_router, precios_router
+from app.routers import etl_router, facturas_router, precios_router
 from app.scheduler import start_scheduler, stop_scheduler
 
 # Configure Sentry for error tracking (if configured)
@@ -78,6 +78,7 @@ setup_security_middleware(app)
 # Include routers
 app.include_router(precios_router)
 app.include_router(etl_router)
+app.include_router(facturas_router)
 
 
 @app.get("/")

@@ -1,6 +1,7 @@
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { productosService, comparadorService } from '../services/productos'
+import type { Comparacion } from '../types/api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { format, parseISO, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -59,27 +60,34 @@ export default function Comparador() {
     queryFn: () => productosService.getAll(),
   })
 
-  const { data: comparacion, isLoading: loadingComparacion, error: comparacionError } = useQuery({
+  const { data: comparacion, isLoading: loadingComparacion, error: comparacionError } = useQuery<Comparacion>({
     queryKey: ['comparacion', selectedProductos, fechaDesde],
     queryFn: () => comparadorService.comparar(selectedProductos, fechaDesde),
     enabled: selectedProductos.length > 0,
     retry: 2,
-    onSuccess: (data) => {
-      if (data?.datos?.length) {
-        trackEvent('comparacion_realizada', {
-          productos: selectedProductos.join(','),
-          cantidad_productos: selectedProductos.length,
-          fecha_desde: fechaDesde,
-          puntos: data.datos.length,
-        })
-      }
-    },
-    onError: (error) => {
-      trackEvent('comparador_error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      })
-    },
   })
+
+  // Track comparison events via useEffect (onSuccess/onError removed in React Query v5)
+  const prevComparacion = useRef(comparacion)
+  useEffect(() => {
+    if (comparacion && comparacion !== prevComparacion.current && comparacion.datos?.length) {
+      trackEvent('comparacion_realizada', {
+        productos: selectedProductos.join(','),
+        cantidad_productos: selectedProductos.length,
+        fecha_desde: fechaDesde,
+        puntos: comparacion.datos.length,
+      })
+    }
+    prevComparacion.current = comparacion
+  }, [comparacion, selectedProductos, fechaDesde])
+
+  useEffect(() => {
+    if (comparacionError) {
+      trackEvent('comparador_error', {
+        error: comparacionError instanceof Error ? comparacionError.message : 'Unknown error',
+      })
+    }
+  }, [comparacionError])
 
   const handleProductoToggle = (productoId: number) => {
     setSelectedProductos((prev) => {

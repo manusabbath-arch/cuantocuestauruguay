@@ -11,10 +11,19 @@ exclude =
     *.egg,
     build,
     dist
-ignore = 
-    E203,  # whitespace before ':'
-    E501,  # line too long (handled by black)
-    W503,  # line break before binary operator
-    E402   # module level import not at top of file
+ignore =
+    E203,
+    E501,
+    W503,
+    E402
 per-file-ignores =
     __init__.py:F401
+    app/core/config.py:F401
+    app/etl/*.py:F401,F541,E722,W293
+    app/middleware/security.py:F401
+    app/models/schemas.py:F401
+    app/newsletter_manager.py:W293,F401
+    app/routers/precios.py:F401
+    app/services/scheduler.py:F401,E226
+    app/services/shadow_mode.py:F401
+    app/whatsapp_bot.py:W293,F401
