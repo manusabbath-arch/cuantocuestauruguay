@@ -7,6 +7,7 @@ import { format, parseISO, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { trackEvent } from '../lib/analytics'
 import { Loader, AlertCircle } from 'lucide-react'
+import SEO from '../components/SEO'
 
 // Skeleton loader para gráfico
 function ChartSkeleton() {
@@ -117,6 +118,11 @@ export default function Comparador() {
 
   return (
     <div className="space-y-8">
+      <SEO
+        title="Comparador de Precios - Combustibles Uruguay"
+        description="Compara la evolución histórica de precios de nafta, gasoil y supergás en Uruguay. Gráficos interactivos con datos oficiales de ANCAP."
+        path="/comparador"
+      />
       <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Comparador de Precios

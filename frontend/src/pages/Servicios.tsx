@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { productosService } from '../services/productos'
 import PriceCard from '../components/PriceCard'
 import { Zap, Droplet, Wifi, AlertCircle } from 'lucide-react'
+import SEO from '../components/SEO'
 
 export default function Servicios() {
   // Fetch UTE (electricidad)
@@ -24,6 +25,11 @@ export default function Servicios() {
 
   return (
     <div className="space-y-8">
+      <SEO
+        title="Tarifas UTE, OSE y Antel - Servicios Públicos Uruguay"
+        description="Consulta las tarifas vigentes de UTE (electricidad), OSE (agua) y Antel (internet/fibra) en Uruguay. Datos oficiales actualizados."
+        path="/servicios"
+      />
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg p-8 text-white">
         <div className="max-w-3xl">

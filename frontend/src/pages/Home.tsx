@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { productosService, preciosService, variacionService } from '../services/productos'
 import PriceCard from '../components/PriceCard'
-import { Fuel, AlertCircle, TrendingUp, BarChart3 } from 'lucide-react'
+import SEO from '../components/SEO'
+import { Fuel, AlertCircle, TrendingUp, BarChart3, FileText, Zap } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { trackEvent } from '../lib/analytics'
 
@@ -19,32 +20,37 @@ export default function Home() {
 
   return (
     <div className="space-y-8">
+      <SEO
+        title="PreciosRegulados.uy - Precios Regulados en Uruguay"
+        description="Consulta precios actualizados de nafta, gasoil, UTE, OSE y Antel en Uruguay. Datos oficiales del gobierno actualizados diariamente. Analizá tu factura de UTE gratis."
+        path="/"
+      />
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg p-8 text-white">
+      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg p-5 sm:p-8 text-white">
         <div className="max-w-3xl">
-          <div className="flex items-center gap-3 mb-4">
-            <Fuel className="w-10 h-10" />
-            <h1 className="text-4xl font-bold">PreciosRegulados.uy</h1>
+          <div className="flex items-center gap-3 mb-3 sm:mb-4">
+            <Fuel className="w-8 h-8 sm:w-10 sm:h-10" />
+            <h1 className="text-2xl sm:text-4xl font-bold">PreciosRegulados.uy</h1>
           </div>
-          <p className="text-xl text-blue-100 mb-4">
+          <p className="text-base sm:text-xl text-blue-100 mb-3 sm:mb-4">
             Consulta precios de combustibles y servicios regulados en Uruguay
           </p>
-          <p className="text-blue-100 mb-6">
+          <p className="text-sm sm:text-base text-blue-100 mb-4 sm:mb-6">
             Datos oficiales actualizados desde ANCAP, MEF y URSEA
           </p>
-          
+
           {/* Quick Action Buttons */}
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => handleNavigate('/precio-nafta-hoy', 'home_cta_nafta')}
-              className="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors flex items-center gap-2"
+              className="bg-white text-blue-600 px-4 py-2.5 sm:py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 min-h-[44px]"
             >
               <TrendingUp className="w-5 h-5" />
               Ver Precio Nafta HOY
             </button>
             <button
               onClick={() => handleNavigate('/comparador', 'home_cta_comparador')}
-              className="bg-blue-700 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-800 transition-colors flex items-center gap-2"
+              className="bg-blue-700 text-white px-4 py-2.5 sm:py-2 rounded-lg font-medium hover:bg-blue-800 transition-colors flex items-center justify-center gap-2 min-h-[44px]"
             >
               <BarChart3 className="w-5 h-5" />
               Comparar Precios
@@ -61,6 +67,30 @@ export default function Home() {
           (ANCAP, MEF, URSEA) y se actualizan periódicamente. PreciosRegulados.uy no se 
           responsabiliza por decisiones tomadas en base a esta información. Para datos 
           oficiales, consulte directamente las fuentes gubernamentales.
+        </div>
+      </div>
+
+      {/* Mi Factura CTA */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl shadow-lg p-5 sm:p-8 text-white">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Zap className="w-6 h-6 sm:w-7 sm:h-7" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg sm:text-xl font-bold mb-1">
+              ¿Estás pagando de más en tu factura de UTE?
+            </h2>
+            <p className="text-blue-200 text-sm sm:text-base">
+              Subí tu factura en PDF y descubrí si podés ahorrar con un cambio de tarifa. Gratis, sin registro, sin guardar tus datos.
+            </p>
+          </div>
+          <button
+            onClick={() => handleNavigate('/mi-factura', 'home_cta_mi_factura')}
+            className="bg-white text-blue-700 px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 min-h-[44px] whitespace-nowrap"
+          >
+            <FileText className="w-5 h-5" />
+            Analizar mi factura
+          </button>
         </div>
       </div>
 

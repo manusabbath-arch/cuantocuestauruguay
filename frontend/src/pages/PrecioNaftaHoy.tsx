@@ -4,6 +4,7 @@ import { productosService, preciosService, variacionService } from '../services/
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { trackEvent } from '../lib/analytics'
+import SEO from '../components/SEO'
 
 export default function PrecioNaftaHoy() {
   const { data: combustibles } = useQuery({
@@ -53,20 +54,25 @@ export default function PrecioNaftaHoy() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'FAQPage',
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: '¿Cuál es el precio de la nafta en Uruguay hoy?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Consulta los precios oficiales actualizados diariamente para Nafta Súper 95 y Nafta Premium 97.'
-            }
-          }
-        ]
-      }) }} />
+      <SEO
+        title="Precio de la Nafta en Uruguay Hoy - Actualizado"
+        description="Precio oficial de la nafta Súper 95 y Premium 97 en Uruguay hoy. Datos de ANCAP actualizados diariamente. Variación mensual y tendencia histórica."
+        path="/precio-nafta-hoy"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: [
+            {
+              '@type': 'Question',
+              name: '¿Cuál es el precio de la nafta en Uruguay hoy?',
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: 'Consulta los precios oficiales actualizados diariamente para Nafta Súper 95 y Nafta Premium 97.',
+              },
+            },
+          ],
+        }}
+      />
 
       <div className="text-center space-y-2 mb-8">
         <h1 className="text-4xl font-bold">Precio de la nafta en Uruguay hoy</h1>

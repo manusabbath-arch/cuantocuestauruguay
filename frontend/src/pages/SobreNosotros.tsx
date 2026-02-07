@@ -1,8 +1,14 @@
 import { Users, Target, Heart, Code2, Globe, Zap } from 'lucide-react'
+import SEO from '../components/SEO'
 
 export default function SobreNosotros() {
   return (
     <div className="max-w-6xl mx-auto space-y-12">
+      <SEO
+        title="Sobre Nosotros"
+        description="PreciosRegulados.uy es un proyecto open source que brinda acceso transparente a precios regulados en Uruguay con datos oficiales del gobierno."
+        path="/sobre-nosotros"
+      />
       {/* Hero Section */}
       <div className="text-center space-y-4">
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900">

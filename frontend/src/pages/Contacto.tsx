@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Mail, MessageSquare, User, Send, CheckCircle, AlertCircle } from 'lucide-react'
 import { trackEvent } from '../lib/analytics'
+import SEO from '../components/SEO'
 
 export default function Contacto() {
   const [formState, setFormState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
@@ -55,6 +56,11 @@ export default function Contacto() {
 
   return (
     <div className="max-w-6xl mx-auto">
+      <SEO
+        title="Contacto"
+        description="Contactanos para consultas, sugerencias o reportar errores sobre PreciosRegulados.uy."
+        path="/contacto"
+      />
       {/* Hero Section */}
       <div className="text-center space-y-4 mb-12">
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900">

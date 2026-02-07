@@ -49,3 +49,14 @@ export interface BillAnalysisResponse {
   recomendaciones: Recomendacion[]
   ahorro_potencial: number
 }
+
+export interface BillHistoryEntry {
+  id: string
+  analyzedAt: string
+  servicio: string
+  periodo: { desde: string; hasta: string }
+  consumo: number
+  unidad: string
+  total: number
+  analysis: BillAnalysisResponse
+}

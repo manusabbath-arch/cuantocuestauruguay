@@ -1,4 +1,4 @@
-import { Zap, Calendar, DollarSign, Target, TrendingDown } from 'lucide-react'
+import { Zap, Calendar, DollarSign, Target, TrendingDown, Share2 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import type { BillAnalysisResponse } from '../types/factura'
 import RecommendationCard from './RecommendationCard'
@@ -206,14 +206,23 @@ export default function BillResults({ analysis, onReset }: BillResultsProps) {
         </div>
       )}
 
-      {/* Reset button - proper touch target */}
-      <div className="text-center pt-2 sm:pt-4 pb-4">
+      {/* Action buttons */}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2 sm:pt-4 pb-4">
         <button
           onClick={onReset}
           className="inline-flex items-center justify-center min-h-[44px] px-6 text-blue-600 hover:text-blue-800 hover:bg-blue-50 font-medium text-sm rounded-lg transition-colors"
         >
           Analizar otra factura
         </button>
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(`Mi factura de ${servicio} fue $${cargos.total.toLocaleString('es-UY')}/mes (${consumo.valor} ${consumo.unidad}). Analizá la tuya gratis en preciosregulados.uy/mi-factura`)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 bg-green-600 hover:bg-green-700 text-white font-medium text-sm rounded-lg transition-colors"
+        >
+          <Share2 className="w-4 h-4" />
+          Compartir por WhatsApp
+        </a>
       </div>
     </div>
   )
