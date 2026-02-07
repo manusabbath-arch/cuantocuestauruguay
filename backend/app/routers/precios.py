@@ -23,13 +23,8 @@ router = APIRouter(prefix="/api/v1", tags=["precios"])
 # Cache simple en memoria con TTL (segundos)
 _CACHE: dict[str, tuple[float, Any]] = {}
 
-# Mapeo de categorías cortas a categorías completas
-CATEGORIA_MAP = {
-    "electricidad": "Servicios Públicos - Electricidad",
-    "agua": "Servicios Públicos - Agua",
-    "telecomunicaciones": "Servicios Públicos - Telecomunicaciones",
-    "combustibles": "Combustibles",
-}
+# Categorías válidas en la DB (nombres cortos, estandarizados)
+CATEGORIAS_VALIDAS = {"electricidad", "agua", "telecomunicaciones", "combustible"}
 
 
 def _cache_get(key: str):
@@ -58,9 +53,7 @@ async def listar_productos(categoria: Optional[str] = None, activo: bool = True,
     query = db.query(Producto).filter(Producto.activo == activo)
 
     if categoria:
-        # Map short category names to full names
-        categoria_full = CATEGORIA_MAP.get(categoria.lower(), categoria)
-        query = query.filter(Producto.categoria == categoria_full)
+        query = query.filter(Producto.categoria == categoria.lower())
 
     productos = query.all()
     _cache_set(cache_key, productos, ttl=600)

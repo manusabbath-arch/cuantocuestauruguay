@@ -61,7 +61,7 @@ class BillAnalyzer:
         productos_ute = (
             self.db.query(Producto)
             .filter(
-                Producto.categoria == "Servicios Públicos - Electricidad",
+                Producto.categoria == "electricidad",
                 Producto.activo.is_(True),
             )
             .all()

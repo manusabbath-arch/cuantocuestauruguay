@@ -22,7 +22,7 @@ def db_session():
     # Seed with UTE tariff data
     producto = Producto(
         nombre="UTE Residencial BT1",
-        categoria="Servicios Públicos - Electricidad",
+        categoria="electricidad",
         unidad="$/kWh",
         activo=True,
     )
