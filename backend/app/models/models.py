@@ -18,7 +18,6 @@ class Producto(Base):
 
     # Relaciones
     precios = relationship("Precio", back_populates="producto", cascade="all, delete-orphan")
-    alertas = relationship("Alerta", back_populates="producto", cascade="all, delete-orphan")
 
 
 class Precio(Base):
@@ -38,18 +37,3 @@ class Precio(Base):
 
     # Constraint único para evitar duplicados
     __table_args__ = (UniqueConstraint("producto_id", "fecha", name="_producto_fecha_uc"),)
-
-
-class Alerta(Base):
-    """Modelo para alertas de usuarios (feature futura)"""
-
-    __tablename__ = "alertas"
-
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), nullable=False)
-    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
-    umbral_cambio = Column(Numeric(5, 2))  # % de cambio para activar alerta
-    activo = Column(Boolean, default=True)
-
-    # Relaciones
-    producto = relationship("Producto", back_populates="alertas")

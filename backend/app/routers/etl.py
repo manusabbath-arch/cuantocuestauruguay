@@ -1,11 +1,12 @@
 from dataclasses import asdict
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.feature_flags import RolloutPhase, feature_flags
 from app.etl.alerts import alert_manager
@@ -21,7 +22,13 @@ from app.services.shadow_mode import ShadowModeExecutor, shadow_log_repo
 router = APIRouter(prefix="/api/v1/etl", tags=["etl"])
 
 
-@router.post("/run")
+async def verify_etl_api_key(x_api_key: Optional[str] = Header(None)):
+    """Protect write endpoints with API key when configured."""
+    if settings.ETL_API_KEY and x_api_key != settings.ETL_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+
+
+@router.post("/run", dependencies=[Depends(verify_etl_api_key)])
 async def ejecutar_etl(shadow_mode: bool = False, user_id: Optional[str] = None, db: Session = Depends(get_db)):
     """Ejecuta el proceso ETL de combustibles manualmente.
 
@@ -51,7 +58,7 @@ async def ejecutar_etl(shadow_mode: bool = False, user_id: Optional[str] = None,
         raise HTTPException(status_code=500, detail=f"Error ejecutando ETL: {str(e)}")
 
 
-@router.post("/utilities/run")
+@router.post("/utilities/run", dependencies=[Depends(verify_etl_api_key)])
 async def ejecutar_utilities_etl(
     service: Optional[str] = None,
     shadow_mode: bool = False,
@@ -122,7 +129,7 @@ async def ejecutar_utilities_etl(
         raise HTTPException(status_code=500, detail=f"Error ejecutando utilities ETL: {str(e)}")
 
 
-@router.post("/run-all")
+@router.post("/run-all", dependencies=[Depends(verify_etl_api_key)])
 async def ejecutar_todo_etl(db: Session = Depends(get_db)):
     """Ejecuta todos los procesos ETL (combustibles + utilities)"""
     try:
@@ -216,7 +223,7 @@ async def obtener_alertas_etl():
         raise HTTPException(status_code=500, detail=f"Error obteniendo alertas: {str(e)}")
 
 
-@router.post("/debug/test-combustibles")
+@router.post("/debug/test-combustibles", dependencies=[Depends(verify_etl_api_key)])
 async def test_combustibles_etl(db: Session = Depends(get_db)):
     """Endpoint de test para debugging del ETL de combustibles"""
     try:
@@ -317,7 +324,7 @@ async def obtener_feature_flags():
     }
 
 
-@router.post("/feature-flags/{etl_name}")
+@router.post("/feature-flags/{etl_name}", dependencies=[Depends(verify_etl_api_key)])
 async def actualizar_feature_flag(
     etl_name: str,
     phase: Optional[RolloutPhase] = None,

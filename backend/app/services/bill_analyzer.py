@@ -29,7 +29,7 @@ ELECTRODOMESTICOS_CONSUMO = {
     "Aire acondicionado (uso diario, 8h)": 120,
     "Heladera con freezer": 45,
     "Lavarropas (4 lavados/sem)": 20,
-    "TV LED 42\" (6h/día)": 15,
+    'TV LED 42" (6h/día)': 15,
     "Iluminación LED (casa entera)": 10,
     "Standby total (aparatos varios)": 15,
 }
@@ -70,10 +70,7 @@ class BillAnalyzer:
         tarifas_oficiales = {}
         for producto in productos_ute:
             ultimo_precio = (
-                self.db.query(Precio)
-                .filter(Precio.producto_id == producto.id)
-                .order_by(desc(Precio.fecha))
-                .first()
+                self.db.query(Precio).filter(Precio.producto_id == producto.id).order_by(desc(Precio.fecha)).first()
             )
             if ultimo_precio:
                 tarifas_oficiales[producto.nombre] = {
@@ -102,9 +99,7 @@ class BillAnalyzer:
         else:
             return 95
 
-    def _generar_recomendaciones_ute(
-        self, bill: BillData, percentil: int
-    ) -> list[Recomendacion]:
+    def _generar_recomendaciones_ute(self, bill: BillData, percentil: int) -> list[Recomendacion]:
         """Generate personalized recommendations based on bill data."""
         recomendaciones = []
         tarifa_lower = bill.tarifa_tipo.lower()
@@ -145,16 +140,13 @@ class BillAnalyzer:
                 f"percentil {percentil} (más que el {percentil}% de los "
                 f"hogares uruguayos). El promedio nacional es ~"
                 f"{UTE_CONSUMO_PROMEDIOS['promedio']} kWh/mes.\n\n"
-                f"Estimación de consumo por electrodoméstico:\n"
-                + "\n".join(breakdown_lines[:5])
+                f"Estimación de consumo por electrodoméstico:\n" + "\n".join(breakdown_lines[:5])
             )
 
             # If calefón is a likely culprit (>300 kWh), add specific tip
             if bill.consumo >= 300:
                 ahorro_calefon = round(
-                    ELECTRODOMESTICOS_CONSUMO["Calefón eléctrico (100L)"]
-                    * bill.precio_unitario
-                    * 0.3,
+                    ELECTRODOMESTICOS_CONSUMO["Calefón eléctrico (100L)"] * bill.precio_unitario * 0.3,
                     0,
                 )
                 desc_text += (

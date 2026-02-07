@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_GENERAL: int = 60  # requests/min
     RATE_LIMIT_ETL: int = 5  # requests/min para /api/v1/etl/*
 
+    # ETL admin API key (set in .env for production, empty = no protection in dev)
+    ETL_API_KEY: str = ""
+
     # Sentry
     SENTRY_DSN: str = ""
 

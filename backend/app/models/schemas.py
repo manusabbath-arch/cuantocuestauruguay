@@ -68,22 +68,3 @@ class ComparacionItem(BaseModel):
 class ComparacionResponse(BaseModel):
     productos: List[ProductoResponse]
     datos: List[ComparacionItem]
-
-
-# Schemas para Alerta
-class AlertaBase(BaseModel):
-    email: str
-    producto_id: int
-    umbral_cambio: Decimal
-    activo: bool = True
-
-
-class AlertaCreate(AlertaBase):
-    pass
-
-
-class AlertaResponse(AlertaBase):
-    id: int
-
-    class Config:
-        from_attributes = True

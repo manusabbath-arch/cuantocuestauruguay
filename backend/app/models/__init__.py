@@ -1,9 +1,6 @@
 # Make models accessible from app.models
-from .models import Alerta, Precio, Producto
+from .models import Precio, Producto
 from .schemas import (
-    AlertaBase,
-    AlertaCreate,
-    AlertaResponse,
     ComparacionItem,
     ComparacionResponse,
     PrecioBase,
@@ -19,7 +16,6 @@ from .schemas import (
 __all__ = [
     "Producto",
     "Precio",
-    "Alerta",
     "ProductoBase",
     "ProductoCreate",
     "ProductoResponse",
@@ -30,7 +26,4 @@ __all__ = [
     "VariacionResponse",
     "ComparacionResponse",
     "ComparacionItem",
-    "AlertaBase",
-    "AlertaCreate",
-    "AlertaResponse",
 ]
