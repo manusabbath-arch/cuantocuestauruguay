@@ -8,8 +8,8 @@ import SEO from '../components/SEO'
 
 export default function PrecioNaftaHoy() {
   const { data: combustibles } = useQuery({
-    queryKey: ['productos', 'Combustibles'],
-    queryFn: () => productosService.getAll('Combustibles'),
+    queryKey: ['productos', 'combustible'],
+    queryFn: () => productosService.getAll('combustible'),
   })
 
   const mapa = useMemo(() => {

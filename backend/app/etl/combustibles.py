@@ -21,7 +21,6 @@ class CombustiblesETL:
         "NAFTA_PREMIUM": "Nafta Premium 97",
         "NAFTA_SUPER": "Nafta Súper 95",
         "GASOIL_50S": "Gasoil 50-S",
-        "GASOIL": "Gasoil Común",
         "SUPERGAS": "Supergás",
     }
 
@@ -31,28 +30,45 @@ class CombustiblesETL:
         self.resource_id = settings.CKAN_COMBUSTIBLES_RESOURCE_ID
 
     async def extract(self) -> Optional[pd.DataFrame]:
-        """Extrae datos de ANCAP vía CKAN API"""
+        """Extrae datos de ANCAP vía CKAN API con paginación"""
         try:
-            params = {"resource_id": self.resource_id, "limit": 1000}
+            all_records: List[dict] = []
+            offset = 0
+            page_size = 1000
 
             logger.info(f"Extracting data from CKAN API: {self.api_url}")
-            response = requests.get(self.api_url, params=params, timeout=30)
-            response.raise_for_status()
 
-            data = response.json()
+            while True:
+                params = {
+                    "resource_id": self.resource_id,
+                    "limit": page_size,
+                    "offset": offset,
+                }
+                response = requests.get(self.api_url, params=params, timeout=30)
+                response.raise_for_status()
+                data = response.json()
 
-            if data.get("success") and "result" in data:
+                if not data.get("success") or "result" not in data:
+                    logger.error("API request was not successful")
+                    break
+
                 records = data["result"].get("records", [])
-                if records:
-                    df = pd.DataFrame(records)
-                    logger.info(f"Extracted {len(df)} records")
-                    return df
-                else:
-                    logger.warning("No records found in API response")
-                    return None
-            else:
-                logger.error("API request was not successful")
-                return None
+                if not records:
+                    break
+
+                all_records.extend(records)
+                offset += page_size
+
+                if len(records) < page_size:
+                    break
+
+            if all_records:
+                df = pd.DataFrame(all_records)
+                logger.info(f"Extracted {len(df)} records total")
+                return df
+
+            logger.warning("No records found in API response")
+            return None
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Error extracting data from CKAN API: {e}")
@@ -139,9 +155,7 @@ class CombustiblesETL:
             nombre_map = {
                 "Gasolina Premium 97": "Nafta Premium 97",
                 "Gasolina Super 95": "Nafta Súper 95",
-                "Gasoil 10-S": "Gasoil 50-S",
                 "Gasoil 50-S": "Gasoil 50-S",
-                "Gasoil": "Gasoil Común",
                 "Supergas": "Supergás",
             }
 
