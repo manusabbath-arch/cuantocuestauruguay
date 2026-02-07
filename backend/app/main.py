@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.core.database import Base, engine
 from app.middleware.security import setup_security_middleware
 from app.routers import etl_router, facturas_router, precios_router
-from app.scheduler import start_scheduler, stop_scheduler
+from app.services.scheduler import scheduler
 
 # Configure Sentry for error tracking (if configured)
 if settings.SENTRY_DSN:
@@ -40,13 +40,13 @@ async def lifespan(app: FastAPI):
     logger.info("Starting application...")
 
     # Iniciar scheduler para tareas periódicas
-    start_scheduler()
+    scheduler.start()
     logger.info("Scheduler started successfully")
 
     yield
 
     # Detener scheduler al cerrar
-    stop_scheduler()
+    scheduler.stop()
     logger.info("Application shutdown complete")
 
 

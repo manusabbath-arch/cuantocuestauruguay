@@ -22,8 +22,5 @@ per-file-ignores =
     app/etl/*.py:F401,F541,E722,W293
     app/middleware/security.py:F401
     app/models/schemas.py:F401
-    app/newsletter_manager.py:W293,F401
     app/routers/precios.py:F401
     app/services/scheduler.py:F401,E226
-    app/services/shadow_mode.py:F401
-    app/whatsapp_bot.py:W293,F401
