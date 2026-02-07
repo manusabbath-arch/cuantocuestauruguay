@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-01-28T08:16:25.648866",
+  "services": {
+    "combustibles": {
+      "name": "combustibles",
+      "phase": "canary",
+      "health": "error",
+      "v1": {
+        "count": 0,
+        "status": "error"
+      },
+      "v2": {
+        "count": 0,
+        "duration": 0,
+        "status": "error"
+      },
+      "monitored_at": "2026-01-28T08:16:33.276748"
+    }
+  }
+}
