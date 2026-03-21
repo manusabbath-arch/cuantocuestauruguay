@@ -1,502 +1,202 @@
-# 📋 Plan Estratégico de Mejoras - CuantoCuestaUruguay
-## Versión 2.0 | Enero 2025
+# Roadmap — PreciosRegulados.uy / CuantoCuestaUruguay
+
+**Última actualización:** Marzo 2026
+**Visión:** Convertir `cuantocuestauruguay.com` en el dashboard de referencia de datos públicos de Uruguay — precios regulados, gasto fiscal, e indicadores económicos, con fuentes oficiales verificables.
 
 ---
 
-## 🎯 Visión General
+## Estado actual (baseline)
 
-Este plan estratégico define los objetivos de evolución del proyecto PreciosRegulados.uy, priorizando seguridad, privacidad, experiencia de usuario y sostenibilidad técnica.
+### Lo que está en producción hoy
 
-**🆕 NUEVO:** Integración gradual hacia ecosistema unificado de transparencia gubernamental.
+| Componente | Estado | Notas |
+|-----------|--------|-------|
+| ETL combustibles ANCAP (CKAN API) | ✅ Producción | Paginado, histórico, scheduler diario |
+| Tarifas UTE / OSE / Antel | ⚠️ Parcial | Datos hardcodeados en `TARIFF_HISTORY`, scraper URSEA existe pero no es fuente primaria |
+| API REST FastAPI | ✅ Producción | Endpoints precios, productos, comparador |
+| Frontend React | ✅ Producción | Home, comparador, MiFactura, servicios |
+| Scheduler APScheduler | ✅ Producción | ETL diario 02:00 UTC |
+| Analizador de facturas UTE | ✅ Producción | `MiFactura.tsx` + `bill_parsers/` |
+| Índices económicos (IPC, BCU) | ❌ No existe | Categoría `indice` en DB sin ETL |
+| Gasto público MEF | ❌ No integrado | Extractor funcional en repo fiscalizador |
+| Indicadores inmobiliarios | ❌ No existe | Fuentes identificadas (INE IAI, DNC) |
+| Tests del ETL | ❌ Ausentes | ETL en producción sin cobertura |
 
-### Ejes Estratégicos
-1. **Seguridad** ✅ - Protección de infraestructura y datos (Completado P0)
-2. **Privacidad** ✅ - Cumplimiento normativo y ética de datos (Completado P0)
-3. **Arquitectura** 🔄 - Migración a monorepo con packages compartidos (En progreso)
-4. **Funcionalidad** - Ampliar servicios y valor para usuarios
-5. **Rendimiento** - Optimizar experiencia y costos
-6. **Sostenibilidad** - Escalabilidad y mantenibilidad
+### Gaps críticos identificados
 
----
-
-## 🆕 PRIORIDAD 0.5: INTEGRACIÓN BACKEND (En Progreso)
-
-### ARCH-001: Estructura de Packages Compartidos ✅ COMPLETADO
-**Objetivo:** Crear base reutilizable para múltiples apps de transparencia
-
-**Acciones completadas:**
-- [x] Crear `backend/packages/etl_core/` con clase `ETLBase`
-- [x] Crear `backend/packages/ckan_client/` con cliente CKAN reutilizable
-- [x] Crear `backend/packages/shared_models/` (Transaction, ETLRun)
-- [x] Documentar en `backend/packages/README.md`
-- [x] Crear ejemplo refactorizado: `combustibles_v2.py`
-- [x] Documentar plan de migración en `docs/MIGRACION_ETL.md`
-- [x] Actualizar `docs/INTEGRACION_BACKEND.md`
-
-**Resultado:** Reducción de 43% en líneas de código, logging automático, métricas integradas
-
-📖 Ver: [docs/INTEGRACION_BACKEND.md](docs/INTEGRACION_BACKEND.md)
+1. **Tarifas utilities desactualizadas** — `TARIFF_HISTORY` con valores manuales que se desactualizan silenciosamente
+2. **Sin índices económicos** — el modelo de DB los soporta pero no hay ETL
+3. **Sin datos de gasto público** — el diferenciador más fuerte vs. sitios similares
+4. **Sin tests de ETL** — el único ETL en producción no tiene cobertura
+5. **Sin "última actualización" visible** — genera desconfianza en los datos
 
 ---
 
-### ARCH-002: Migrar ETL a usar Packages (Próximo)
-**Objetivo:** Refactorizar ETL existentes para usar arquitectura compartida
+## Capa 1 — Precios y costo de vida (ya existe, mejorar)
 
-**Acciones:**
-- [ ] Testear `combustibles_v2.py` en staging
-- [ ] Migrar endpoint `/etl/combustibles` a v2
-- [ ] Crear `ute_v2.py`, `ose_v2.py`, `antel_v2.py`
-- [ ] Comparar performance v1 vs v2 (shadow mode)
-- [ ] Deploy gradual a producción
+Fuente base: `catalogodatos.gub.uy` (CKAN API) + URSEA PDFs
 
-**Timeline:** Sprint 2-4 (2-3 semanas)
+### P1-A: Automatizar tarifas utilities desde URSEA
+**Problema:** `TARIFF_HISTORY` en `utilities.py` es un dict manual con valores estimados. Si UTE cambia tarifas (cada ~6 meses), los datos muestran valores incorrectos sin notificación.
 
-📖 Ver: [docs/MIGRACION_ETL.md](docs/MIGRACION_ETL.md)
+**Solución:** Hacer del scraper de PDF URSEA la fuente primaria, con `TARIFF_HISTORY` como fallback.
 
----
+**Archivos a modificar:**
+- `backend/app/etl/utilities.py` — activar `parse_ute_tariff_pdf()` y `parse_ose_tariff_pdf()` como fuente primaria
+- `backend/app/etl/pdf_parser.py` — validar parsing actual de PDFs URSEA
+- `backend/app/services/scheduler.py` — ajustar frecuencia utilities (semanal es suficiente)
 
-## 🔴 PRIORIDAD 0: SEGURIDAD CRÍTICA ✅ COMPLETADO
-
-### SEC-001: Configuración de Seguridad en Cloudflare ✅
-**Objetivo:** Proteger el dominio cuantocuestauruguay.com contra ataques comunes
-
-**Acciones completadas:**
-- [x] Activar **Cloudflare WAF** (Web Application Firewall)
-  - Reglas OWASP Core Ruleset
-  - Protección contra inyección SQL, XSS, CSRF
-- [x] Configurar **SSL/TLS en modo "Full (Strict)"**
-  - SSL Labs: **Grado A+**
-  - HSTS habilitado y preload submitted
-  - Minimum TLS Version: 1.2
-- [x] Activar **Rate Limiting** para API
-  - 10 requests/10s para endpoints API
-  - 5 requests/10s para endpoints ETL
-- [x] Configurar **Bot Fight Mode**
-- [x] Habilitar **DDoS Protection** + DNSSEC
-- [x] Configurar **Firewall Rules**:
-  - Bloquear métodos HTTP innecesarios
-  - Security headers configurados
-
-**Resultado:** SSL Labs A+, SecurityHeaders.com en progreso a A
-
-📖 Ver: [docs/CLOUDFLARE_SECURITY.md](docs/CLOUDFLARE_SECURITY.md)
+**URL fuente:** `https://www.gub.uy/unidad-reguladora-servicios-energia-agua/`
 
 ---
 
-### SEC-002: Hardening del Backend ✅ COMPLETADO
-**Objetivo:** Asegurar aplicación FastAPI y PostgreSQL
+### P1-B: ETL de índices económicos (IPC, dólar BCU)
+**Estado actual:** El modelo `Producto` tiene `categoria='indice'` pero no hay ningún ETL que lo alimente.
 
-**Acciones:**
-- [ ] **Secrets Management**
-  - Rotar `SECRET_KEY` de JWT (mínimo 256 bits)
-  - Usar generador criptográfico: `openssl rand -hex 32`
-  - Almacenar en Render Environment Variables (no en código)
-- [ ] **Configurar CORS estrictamente**
-  - Solo permitir orígenes conocidos:
-    ```
-    CORS_ORIGINS=https://cuantocuestauruguay.com,https://www.cuantocuestauruguay.com
-    ```
-  - Eliminar wildcards (`*`)
-- [ ] **Headers de Seguridad HTTP**
-  - Implementar middleware de seguridad:
-    - `X-Content-Type-Options: nosniff`
-    - `X-Frame-Options: DENY`
-    - `X-XSS-Protection: 1; mode=block`
-    - `Strict-Transport-Security: max-age=31536000`
-    - `Content-Security-Policy` con directivas restrictivas
-- [ ] **Rate Limiting a nivel de aplicación**
-  - Implementar `slowapi` para FastAPI
-  - Límites por endpoint:
-    - `GET /api/v1/productos`: 60/min
-    - `POST /api/v1/etl/*`: 5/min (requiere autenticación)
-- [ ] **Input Validation**
-  - Validar todos los parámetros con Pydantic
-  - Sanitizar inputs para prevenir inyección SQL
-  - Límites de tamaño en request body
-- [ ] **PostgreSQL Security**
-  - Cambiar contraseña de BD (generar segura)
-  - Habilitar SSL para conexiones (Render soporta)
-  - Configurar `pg_hba.conf` para solo permitir localhost
-- [ ] **Logging y Monitoreo**
-  - Registrar intentos de acceso no autorizados
-  - Alertas para patrones sospechosos
-  - No loguear datos sensibles (passwords, tokens)
+**Fuentes disponibles (CKAN, gratuitas):**
+- IPC mensual INE: `catalogodatos.gub.uy`
+- Tipo de cambio BCU: `catalogodatos.gub.uy/dataset/tipo-de-cambio`
+- Salario nominal: disponible en CKAN
 
-**Resultado esperado:** Cumplir OWASP Top 10 básico
+**Implementación:** Nuevo `IndicesETL` siguiendo el patrón de `CombustiblesETL` — aprox. 80 líneas.
+
+**Archivos a crear:**
+- `backend/app/etl/indices.py`
+- Agregar job mensual en `backend/app/services/scheduler.py`
 
 ---
 
-### SEC-003: Gestión de Dependencias
-**Objetivo:** Eliminar vulnerabilidades conocidas en librerías
+### P1-C: Indicador "última actualización" en frontend
+**Problema:** El usuario no sabe si los precios son de hoy o de hace 3 meses.
 
-**Acciones:**
-- [ ] **Auditoría de dependencias**
-  - Backend: `pip install safety && safety check`
-  - Frontend: `npm audit`
-- [ ] **Actualizar librerías críticas**
-  - Priorizar: `fastapi`, `pydantic`, `sqlalchemy`, `psycopg2`
-  - Verificar breaking changes
-- [ ] **Configurar Dependabot**
-  - GitHub Actions para PRs automáticos de seguridad
-  - Review semanal de actualizaciones
-- [ ] **Pinning de versiones**
-  - `requirements.txt` con versiones exactas (`==`)
-  - `package-lock.json` en control de versiones
+**Implementación:** Agregar campo `fecha` visible en cada `PriceCard`. El campo ya existe en el modelo `Precio`.
 
-**Resultado esperado:** 0 vulnerabilidades críticas/altas
+**Archivos a modificar:**
+- `frontend/src/components/PriceCard.tsx`
+- `backend/app/models/schemas.py` — asegurar que `fecha` se expone en la respuesta
 
 ---
 
-## 🟡 PRIORIDAD 1: PRIVACIDAD Y CUMPLIMIENTO (2-4 semanas)
+## Capa 2 — Gasto público MEF (nuevo)
 
-### PRIV-001: Política de Privacidad y GDPR/LPDP
-**Objetivo:** Cumplir Ley de Protección de Datos Personales (Ley N° 18.331) de Uruguay
+Diferenciador único: ningún sitio uruguayo muestra ejecución presupuestal de forma accesible.
 
-**Acciones:**
-- [ ] **Crear Política de Privacidad**
-  - Qué datos recolectamos (analytics, logs)
-  - Cómo los usamos
-  - Cuánto tiempo los guardamos
-  - Derechos de los usuarios (ARCO: Acceso, Rectificación, Cancelación, Oposición)
-- [ ] **Cookies y Tracking**
-  - Banner de consentimiento (si se usa analytics)
-  - Opción de opt-out
-  - Clasificar cookies: esenciales vs analytics
-- [ ] **Anonimización de Logs**
-  - Enmascarar IPs en logs: `192.168.x.x`
-  - No guardar información personal identificable (PII)
-  - Retención máxima: 90 días
-- [ ] **Términos de Servicio**
-  - Disclaimer sobre uso de datos
-  - Limitación de responsabilidad
-  - Contacto para ejercer derechos
+### P2-A: Integrar extractor MEF
+El extractor ya existe y funciona en `bot-fiscalizador-gastos-publicos-Uruguay/extractors/extractor_mef.py`. Solo necesita portarse al pipeline de cuantocuestauruguay.
 
-**Resultado esperado:** Cumplimiento legal de Ley 18.331
+**Fuentes oficiales:**
+- Rendición de Cuentas PDF Tomo III: `gub.uy/ministerio-economia-finanzas/`
+- Portal Presupuesto Abierto: `presupuestouruguay.gub.uy/`
+- CKAN MEF: `catalogodatos.gub.uy/organization/ministerio-de-economia-y-finanzas`
+
+**Archivos a crear:**
+- `backend/app/etl/gasto_publico.py` — adaptar `MEFExtractor` + `cleaner_mef.py`
+- `backend/app/models/models.py` — nuevo modelo `EjecucionPresupuestal`
+- `backend/app/routers/gasto.py` — endpoints por ministerio, período, comparación YoY
+- `frontend/src/pages/GastoPublico.tsx` — nueva página con barras por ministerio
+
+**Datos a mostrar:**
+- Ejecución presupuestal por ministerio (% del presupuesto ejecutado)
+- Comparación vs. período anterior
+- Fuente citada explícitamente (credibilidad)
 
 ---
 
-### PRIV-002: Analytics Ético (Sin Google Analytics)
-**Objetivo:** Medir uso sin invadir privacidad
-
-**Acciones:**
-- [ ] Implementar **Plausible Analytics** (GDPR-friendly)
-  - Alternativa: **umami** (self-hosted, open source)
-  - No cookies, no tracking de usuarios
-  - Datos agregados, no individuales
-- [ ] Métricas a trackear:
-  - Páginas vistas
-  - Productos más consultados
-  - Fuentes de tráfico (referrers)
-  - Dispositivos (móvil vs desktop)
-- [ ] Dashboard público de estadísticas
-  - Transparencia con usuarios
-  - Ejemplos: plausible.io/cuantocuestauruguay.com
-
-**Resultado esperado:** Analytics sin comprometer privacidad
+### P2-B: API Presupuesto Abierto como complemento
+`presupuestouruguay.gub.uy` ofrece datos más granulares que el PDF Tomo III. Evaluar como fuente secundaria para datos más frecuentes.
 
 ---
 
-## 🟢 PRIORIDAD 2: FUNCIONALIDAD Y VALOR (1-3 meses)
+## Capa 3 — Mercado inmobiliario (futuro próximo)
 
-### FUNC-001: ETL de Servicios Públicos
-**Objetivo:** Ampliar catálogo con UTE, OSE, Antel
+Fuentes públicas confirmadas y gratuitas:
 
-**Acciones:**
-- [ ] **UTE (Electricidad)**
-  - Implementar scraper de https://portal.ute.com.uy/tarifas
-  - Modelos: `TarifaElectricidad` (residencial, comercial, industrial)
-  - Campos: potencia, consumo, cargo fijo, energía
-- [ ] **OSE (Agua y Saneamiento)**
-  - Scraper de https://www.ose.com.uy/tarifas
-  - Modelos: `TarifaAgua` (categorías, consumo m³)
-  - Cargo fijo + variable por m³
-- [ ] **Antel (Telecomunicaciones)**
-  - API/scraper de planes (Fibra, Móvil, Telefonía)
-  - Comparador de planes por velocidad/precio
-- [ ] **Scheduler automático**
-  - Ejecutar ETL semanal (viernes 00:00 UTC)
-  - Alertas si falla ETL
-  - Logs de cambios de precios
+| Fuente | Dato | API | Frecuencia |
+|--------|------|-----|-----------|
+| INE IAI Compraventa | Índices precios/operaciones | CSV/JSON CKAN | Mensual |
+| DNC Catastro | Valores catastrales, geometría parcelaria | REST/SHP | Mensual |
+| MercadoLibre API | Listados actuales en venta | JSON REST | Tiempo real |
 
-**Resultado esperado:** 3 servicios nuevos con datos históricos
+**Limitación conocida:** No existen datos públicos de precios de transacciones individuales (DGR los tiene pero no los publica). La Capa 3 se enfoca en índices agregados (INE) + oferta actual (MercadoLibre).
+
+### P3-A: ETL INE IAI (índice mensual compraventa)
+Primer paso de Capa 3. Dataset limpio, formato estándar CKAN, actualización mensual.
+
+**Archivos a crear:**
+- `backend/app/etl/inmobiliario.py`
+- `frontend/src/pages/Inmobiliario.tsx`
 
 ---
 
-### FUNC-002: Sistema de Alertas de Precios
-**Objetivo:** Notificar a usuarios sobre cambios significativos
+## Deuda técnica prioritaria
 
-**Acciones:**
-- [ ] **Backend: Webhook/Email**
-  - Endpoint para suscribirse: `POST /api/v1/alertas/subscribe`
-  - Almacenar email + productos de interés
-  - Disparar cuando cambio > 5%
-- [ ] **Frontend: Modal de suscripción**
-  - Formulario simple: email + checkbox de productos
-  - Confirmación doble opt-in (GDPR)
-- [ ] **Integración con servicio de email**
-  - Opción 1: SendGrid (free tier: 100 emails/día)
-  - Opción 2: Mailgun
-  - Template HTML responsive
-- [ ] **Funcionalidad de comparación histórica**
-  - "El gasoil subió 8% este mes"
-  - Gráfico adjunto en email
+### DT-1: Tests del ETL de combustibles
+El único ETL en producción sin ningún test. Si CKAN cambia un campo o el formato, falla silenciosamente.
 
-**Resultado esperado:** Engagement de usuarios +30%
+**Archivos a crear:**
+- `tests/etl/test_combustibles.py` — mockear respuesta CKAN, validar transformación
+- `tests/etl/test_utilities.py` — validar parsing de tarifas
+
+**Cobertura mínima objetivo:** funciones `extract()`, `transform()`, `load()` de cada ETL.
 
 ---
 
-### FUNC-003: API Pública con API Keys
-**Objetivo:** Permitir uso externo controlado
+### DT-2: Migración ARCH-002 pendiente
+El roadmap anterior dejó pendiente migrar los ETLs a la arquitectura de packages compartidos (`ETLBase`, `CkanClient`). `combustibles_v2.py` existe pero no está en producción.
 
-**Acciones:**
-- [ ] **Sistema de API Keys**
-  - Endpoint: `POST /api/v1/auth/register` → devuelve API Key
-  - Header: `X-API-Key: xxxxx`
-  - Rate limiting por key: 1000 req/día (free tier)
-- [ ] **Documentación mejorada**
-  - Swagger UI con ejemplos de cURL
-  - Guía de inicio rápido
-  - SDKs básicos (Python, JavaScript)
-- [ ] **Tier Premium (opcional futuro)**
-  - Free: 1000 req/día
-  - Premium: ilimitado + soporte
-  - Monetización sostenible
-
-**Resultado esperado:** 50+ desarrolladores usando la API en 6 meses
+**Acción:** Testear en staging y hacer deploy gradual con shadow mode.
 
 ---
 
-## 🔵 PRIORIDAD 3: RENDIMIENTO Y UX (3-6 meses)
+### DT-3: Alertas de fallo ETL
+`alerts.py` existe pero no está claro si notifica fallos de jobs ETL (excepciones) vs. solo cambios de precios. Si el job falla a las 2:00 AM, nadie se entera.
 
-### PERF-001: Optimización de Frontend
-**Objetivo:** Mejorar performance y SEO
-
-**Acciones:**
-- [ ] **Code Splitting y Lazy Loading**
-  - Dividir bundle de React
-  - Cargar rutas bajo demanda
-  - Reducir First Contentful Paint (FCP) < 1.5s
-- [ ] **Optimización de imágenes**
-  - WebP para gráficos
-  - Lazy loading de charts
-  - CDN para assets estáticos
-- [ ] **SEO On-Page**
-  - Meta tags dinámicos por producto
-  - Open Graph para redes sociales
-  - Schema.org structured data (Product, PriceSpecification)
-  - Sitemap XML automático
-- [ ] **PWA (Progressive Web App)**
-  - Service worker para offline
-  - Manifest.json con íconos
-  - Instalable en móviles
-- [ ] **Lighthouse Score > 90**
-  - Performance, Accessibility, Best Practices, SEO
-
-**Resultado esperado:** Tiempo de carga < 2s, SEO rank +50%
+**Acción:** Agregar notificación (Telegram o email) cuando un job ETL lanza excepción.
 
 ---
 
-### PERF-002: Caché y CDN
-**Objetivo:** Reducir latencia y costos de servidor
+## Backlog sin fecha
 
-**Acciones:**
-- [ ] **Redis para caché de API**
-  - Cachear respuestas de `/productos` (TTL: 1 hora)
-  - Cachear históricos (TTL: 24 horas)
-  - Invalidar al ejecutar ETL
-- [ ] **Cloudflare Page Rules**
-  - Cachear assets estáticos: `/*.(js|css|png|jpg|svg)`
-  - Edge caching para HTML (TTL: 5 min)
-- [ ] **Compresión Gzip/Brotli**
-  - Activar en Cloudflare
-  - Reducir tamaño de respuestas 70%
-
-**Resultado esperado:** Latencia API < 200ms (p95)
+- Dark mode — `localStorage` + clases Tailwind
+- Export a CSV/PNG desde los gráficos
+- Plausible Analytics en reemplazo de Google Analytics (privacidad)
+- PWA / Service Worker para uso offline
+- API pública con keys para consumo externo controlado
+- Staging environment — rama `develop` → deploy preview
 
 ---
 
-### UX-001: Mejoras de Interfaz
-**Objetivo:** Experiencia de usuario excepcional
+## Orden de implementación recomendado
 
-**Acciones:**
-- [ ] **Dark Mode**
-  - Toggle en header
-  - Persistir preferencia en localStorage
-  - Colores optimizados (WCAG AA)
-- [ ] **Gráficos interactivos avanzados**
-  - Zoom en rangos de fechas
-  - Tooltips con detalles
-  - Exportar a PNG/CSV
-- [ ] **Búsqueda inteligente**
-  - Autocompletar productos
-  - Filtros por categoría, región
-  - Sugerencias populares
-- [ ] **Comparador multi-producto**
-  - Seleccionar hasta 5 productos
-  - Gráfico superpuesto
-  - Tabla comparativa
-- [ ] **Vista móvil mejorada**
-  - Bottom sheet para filtros
-  - Gestos swipe
-  - Optimizar para pantallas pequeñas
+```
+Sprint 1 (1-2 semanas)
+  P1-C  Indicador "última actualización" → impacto visual inmediato, ~2h
+  DT-1  Tests ETL combustibles → deuda técnica bloqueante para escalar
+  P1-B  ETL índices IPC/BCU → completa la propuesta de valor Capa 1
 
-**Resultado esperado:** Tasa de rebote < 40%, tiempo en sitio > 3 min
+Sprint 2 (2-4 semanas)
+  P1-A  Automatizar tarifas URSEA → elimina riesgo de datos incorrectos
+  P2-A  Integrar extractor MEF → diferenciador único, extractor ya listo
+
+Sprint 3 (1-2 meses)
+  P3-A  ETL INE IAI inmobiliario → primera pieza de Capa 3
+  DT-2  Migración ARCH-002 → deuda técnica arquitectural
+  DT-3  Alertas de fallo ETL → observabilidad en producción
+```
 
 ---
 
-## 🟣 PRIORIDAD 4: SOSTENIBILIDAD (6-12 meses)
+## Fuentes de datos de referencia
 
-### SUST-001: Monitoreo y Observabilidad
-**Objetivo:** Detectar y resolver problemas proactivamente
-
-**Acciones:**
-- [ ] **Sentry para error tracking**
-  - Configurar DSN en backend y frontend
-  - Alertas de errores críticos
-  - Source maps para stack traces legibles
-- [ ] **Uptime Monitoring**
-  - UptimeRobot (gratis: 50 monitores)
-  - Verificar cada 5 minutos
-  - Alertas por email/SMS
-- [ ] **Logs centralizados**
-  - Render logs → external service (Logtail, Papertrail)
-  - Retención: 30 días
-  - Búsqueda full-text
-- [ ] **Dashboards de métricas**
-  - Grafana + Prometheus (opcional)
-  - Métricas: requests/s, latencia, errores, uptime
-  - Alertas por umbrales
-
-**Resultado esperado:** Tiempo de detección de incidentes < 5 min
-
----
-
-### SUST-002: Documentación y Onboarding
-**Objetivo:** Facilitar contribuciones de la comunidad
-
-**Acciones:**
-- [ ] **Contributing Guide**
-  - CONTRIBUTING.md con guía de estilo
-  - Proceso de PR review
-  - Code of Conduct
-- [ ] **Documentación técnica**
-  - ADRs (Architecture Decision Records)
-  - Diagramas de arquitectura (mermaid)
-  - Guía de deployment local
-- [ ] **Videos tutoriales**
-  - YouTube: "Cómo contribuir"
-  - "Cómo usar la API"
-  - "Deploy tu propia instancia"
-- [ ] **Issues etiquetados**
-  - `good-first-issue` para nuevos
-  - `help-wanted` para comunidad
-  - Templates de issues/PRs
-
-**Resultado esperado:** 10+ contribuidores externos en 1 año
-
----
-
-### SUST-003: Testing y CI/CD
-**Objetivo:** Garantizar calidad de código
-
-**Acciones:**
-- [ ] **Aumentar cobertura de tests**
-  - Backend: >80% coverage
-  - Frontend: >70% coverage
-  - Tests E2E con Playwright
-- [ ] **GitHub Actions mejorados**
-  - Lint (flake8, eslint)
-  - Tests unitarios
-  - Tests de integración
-  - Security scan (Snyk, Trivy)
-  - Deploy automático solo si tests pasan
-- [ ] **Pre-commit hooks**
-  - Formateo automático (black, prettier)
-  - Validación de tipos (mypy, TypeScript)
-  - No permitir commits con errores
-- [ ] **Staging environment**
-  - Rama `develop` → deploy a staging
-  - Pruebas antes de prod
-  - Smoke tests automáticos
-
-**Resultado esperado:** 0 hotfixes en producción, CI/CD < 5 min
-
----
-
-## 📊 KPIs y Métricas de Éxito
-
-### Seguridad
-- ✅ 0 vulnerabilidades críticas en dependencias
-- ✅ SSL Labs Score: A+
-- ✅ Uptime: >99.5%
-- ✅ Tiempo de respuesta a incidentes: <1 hora
-
-### Privacidad
-- ✅ Cumplimiento LPDP (Ley 18.331)
-- ✅ 0 quejas de privacidad
-- ✅ Política de privacidad accesible en <2 clicks
-
-### Funcionalidad
-- ✅ 10+ productos con datos históricos
-- ✅ ETL exitoso >95% de ejecuciones
-- ✅ API requests: 10K/mes (objetivo: 100K/mes)
-
-### Rendimiento
-- ✅ Lighthouse Score: >90
-- ✅ Tiempo de carga: <2s
-- ✅ API latency p95: <300ms
-
-### Sostenibilidad
-- ✅ Documentación completa (README, API docs, ADRs)
-- ✅ Test coverage: >75%
-- ✅ Contribuidores activos: >5
-
----
-
-## 🗓️ Cronograma Tentativo
-
-### Mes 1 (Inmediato)
-- ✅ SEC-001: Cloudflare security
-- ✅ SEC-002: Backend hardening
-- ✅ SEC-003: Dependencies audit
-- ⏳ PRIV-001: Privacy policy (inicio)
-
-### Mes 2-3
-- ⏳ PRIV-001: Privacy policy (finalización)
-- ⏳ PRIV-002: Analytics ético
-- ⏳ FUNC-001: ETL servicios (UTE, OSE, Antel)
-
-### Mes 4-6
-- ⏳ FUNC-002: Sistema de alertas
-- ⏳ FUNC-003: API pública con keys
-- ⏳ PERF-001: Frontend optimization
-- ⏳ UX-001: UI improvements
-
-### Mes 7-12
-- ⏳ PERF-002: Caché y CDN
-- ⏳ SUST-001: Monitoring
-- ⏳ SUST-002: Documentation
-- ⏳ SUST-003: Testing & CI/CD
-
----
-
-## 🚀 Implementación Inmediata
-
-Comenzaremos ahora con las acciones de **PRIORIDAD 0** que no requieren aprobación:
-
-1. **Cloudflare Security Hardening** (SEC-001)
-2. **Backend Security Headers** (SEC-002 parcial)
-3. **Dependency Audit** (SEC-003)
-
----
-
-## 📝 Notas Finales
-
-Este roadmap es un documento vivo que se actualizará según:
-- Feedback de usuarios
-- Evolución de amenazas de seguridad
-- Recursos disponibles
-- Prioridades del negocio
-
-**Última actualización:** 26 de enero de 2026
-**Próxima revisión:** 26 de febrero de 2026
+| Fuente | URL | Formato | Actualización |
+|--------|-----|---------|--------------|
+| CKAN Datos Abiertos UY | `catalogodatos.gub.uy/api/3/action` | API REST JSON | Variable |
+| ANCAP combustibles | CKAN resource `62bacbab-9bae-4316-af56-7c1bf468f546` | API REST | Semanal |
+| URSEA tarifas | `gub.uy/unidad-reguladora-servicios-energia-agua/` | PDFs | Semestral |
+| INE IPC | `catalogodatos.gub.uy` | CSV/JSON | Mensual |
+| BCU tipo de cambio | `catalogodatos.gub.uy` | CSV/JSON | Diaria |
+| INE IAI Compraventa | `ine.gub.uy/actividad-inmobiliaria` | CSV/JSON | Mensual |
+| DNC Catastro | `gis.catastro.gub.uy/arcgis/rest/services/` | REST/SHP | Mensual |
+| MEF Rendición de Cuentas | `gub.uy/ministerio-economia-finanzas/` | PDF | Anual |
+| Portal Presupuesto Abierto | `presupuestouruguay.gub.uy/` | Descarga | Mensual |
+| MercadoLibre API | `developers.mercadolibre.com.uy/` | JSON REST | Tiempo real |

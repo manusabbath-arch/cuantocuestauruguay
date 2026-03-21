@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { productosService } from '../services/productos'
 import PriceCard from '../components/PriceCard'
+import ProductoCard from '../components/ProductoCard'
 import { Zap, Droplet, Wifi, AlertCircle } from 'lucide-react'
 import SEO from '../components/SEO'
 
@@ -166,29 +167,6 @@ export default function Servicios() {
         </a>
       </div>
     </div>
-  )
-}
-
-// Component to fetch and display individual product data
-function ProductoCard({ producto }: { producto: any }) {
-  const { data: ultimoPrecio } = useQuery({
-    queryKey: ['precio-ultimo', producto.id],
-    queryFn: () => productosService.getPrecioUltimo(producto.id),
-    retry: false,
-  })
-
-  const { data: variacion } = useQuery({
-    queryKey: ['variacion', producto.id],
-    queryFn: () => productosService.getVariacion(producto.id, 30),
-    retry: false,
-  })
-
-  return (
-    <PriceCard
-      producto={producto}
-      precio={ultimoPrecio?.valor}
-      variacion={variacion}
-    />
   )
 }
 

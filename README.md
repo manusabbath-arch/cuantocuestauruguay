@@ -27,9 +27,9 @@ PreciosRegulados.uy es una aplicación web de código abierto que proporciona ac
 - 🔓 **API REST pública** con documentación OpenAPI
 - ⚡ **Servicios públicos** - UTE (electricidad), OSE (agua), Antel (telecomunicaciones)
 - ⛽ **Combustibles** - ANCAP (nafta, gasoil, supergás)
+- 💱 **Índices económicos** - IPC y dólar BCU
 - 💬 **Contacto** - Formulario integrado con Formspree
 - 📖 **Sobre Nosotros** - Información del proyecto y equipo
-- 📊 **Google Analytics** - Métricas de uso del sitio
 
 ## 🏗️ Arquitectura
 
@@ -55,29 +55,14 @@ PreciosRegulados.uy es una aplicación web de código abierto que proporciona ac
       └────────► CKAN API (catalogodatos.gub.uy)
 ```
 
-### Nueva Arquitectura de Backend (Monorepo)
+### Alcance Actual del Backend
 
-El backend está evolucionando hacia una arquitectura de **paquetes compartidos** para soportar múltiples apps:
+La implementación actual está concentrada en `backend/app/` con:
+- ETLs de combustibles, utilities e índices
+- API FastAPI para consulta de precios y disparo de ETLs
+- Scheduler con jobs diarios y alertas operativas
 
-```
-backend/
-├── packages/              # 📦 Código compartido (nuevo)
-│   ├── etl_core/         # Base común para ETL
-│   ├── ckan_client/      # Cliente CKAN reutilizable
-│   └── shared_models/    # Modelos compartidos
-└── app/                   # App de Precios Regulados
-    ├── api/              # Endpoints FastAPI
-    ├── models/           # Modelos de DB
-    └── etl/              # ETL jobs
-
-# Próximamente:
-# └── apps/
-#     ├── precios/       # Precios Regulados
-#     ├── transparencia/ # Datos Abiertos
-#     └── gastos/        # Gastos Públicos
-```
-
-📖 Ver [INTEGRACION_BACKEND.md](docs/INTEGRACION_BACKEND.md) para más detalles.
+Para el estado canónico del proyecto, ver `.github/PROJECT_CONTEXT.md`.
 
 ### Stack Tecnológico
 
@@ -101,55 +86,18 @@ backend/
 - Railway.app / Render.com (backend hosting)
 - Cloudflare Pages (frontend hosting)
 
-## 🚀 ARCH-002: ETL Refactoring & Zero-Downtime Migration ✅
+## 📌 Nota de Consistencia de Documentación
 
-**Status**: ✅ **COMPLETE** | **January 2026** | **8 Tareas completadas**
+Este README prioriza onboarding y operación local. Si hay contradicciones entre este archivo y la implementación real, prevalece el código.
 
-### Resumen del Proyecto
+Orden recomendado de lectura:
+1. Código real en `backend/app` y `frontend/src`
+2. `.github/PROJECT_CONTEXT.md`
+3. `ROADMAP.md`
+4. `README.md`
 
-ARCH-002 refactorizó el pipeline ETL completo con:
-- **43% reducción** de código duplicado (1,850 → 1,050 líneas)
-- **95% cobertura de tests** (44 tests, 100% pasando)
-- **Despliegue sin downtime** (feature flags + shadow mode)
-- **Rollback automático** si error_rate > 5% o response_time > 10%
-
-### Implementación
-
-| Métrica | v1 | v2 | Mejora |
-|---------|----|----|--------|
-| Lines of Code | 1,850 | 1,050 | -43% ✅ |
-| Code Duplication | 45% | 5% | -40pp ✅ |
-| Test Coverage | 40% | 95% | +55pp ✅ |
-| Avg Processing | 3.45s | 2.89s | 16% faster ✅ |
-| Deployment Risk | Alto | Cero | Feature flags ✅ |
-
-### Documentación
-
-- 📊 [ARCH-002_COMPREHENSIVE_SUMMARY.md](./ARCH-002_COMPREHENSIVE_SUMMARY.md) - Reporte completo
-- 📈 [TAREA_7_ROLLOUT_PLAN.md](./TAREA_7_ROLLOUT_PLAN.md) - Plan de despliegue gradual
-- 🧹 [TAREA_8_FINAL_CLEANUP.md](./TAREA_8_FINAL_CLEANUP.md) - Procedimientos finales
-
-### Cómo Funciona
-
-```
-Request → Feature Flag
-├─ DISABLED: v1 (100% users)
-├─ SHADOW: v1 + v2 (parallel validation)
-├─ CANARY: 10% users → v2
-├─ GRADUAL: 25-50% users → v2
-└─ FULL: 100% users → v2 ✅ PRODUCTION READY
-```
-
-### Tests
-
-```bash
-# Correr todos los tests de ARCH-002 (44 total)
-pytest backend/tests/test_combustibles_v2.py \
-       backend/tests/test_shadow_mode.py \
-       backend/tests/test_feature_flags.py -v
-
-✅ 44/44 PASSED
-```
+Colaboración con asistentes:
+- Flujo mínimo Copilot + Claude: `docs/AI_COLLAB_WORKFLOW.md`
 
 ### 🔒 Dependabot
 
@@ -244,9 +192,11 @@ La API REST está documentada con OpenAPI/Swagger. Una vez ejecutando el backend
 
 **ETL (Extracción de Datos):**
 - `POST /api/v1/etl/run` - Ejecuta ETL de combustibles
-- `POST /api/v1/etl/utilities/run?service={ute|ose|antel}` - Ejecuta ETL de servicios públicos
+- `POST /api/v1/etl/utilities/run` - Ejecuta ETL de servicios públicos
+- `POST /api/v1/etl/indices/run` - Ejecuta ETL de IPC y dólar
 - `POST /api/v1/etl/run-all` - Ejecuta todos los ETL
 - `GET /api/v1/etl/status` - Estado de los procesos ETL
+- `GET /api/v1/etl/alerts` - Estado de alertas operativas del scheduler
 
 ## 🧪 Tests
 

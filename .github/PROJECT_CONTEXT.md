@@ -90,6 +90,11 @@ Frontend:
 - frontend/src/pages/SobreNosotros.tsx
 - frontend/src/pages/GastoPublico.tsx
 - frontend/src/components/PriceCard.tsx
+- frontend/src/services/ — módulos de API (productos.ts, gasto.ts)
+- frontend/src/hooks/ — custom hooks (useIsMobile.ts, useGasto.ts)
+- frontend/src/hooks/useGasto.ts — (mar-21-2026) hooks para P2-A gasto
+- frontend/src/components/OrganismoFilter.tsx — (mar-21-2026) filtro reutilizable
+- frontend/src/components/AñoFilter.tsx — (mar-21-2026) filtro reutilizable
 
 ## Stack real
 
@@ -327,3 +332,56 @@ Actualizar si cambia cualquiera de estos puntos:
 - estructura real del repo
 - comandos recomendados de desarrollo/test
 - advertencias importantes sobre docs desalineadas
+
+## Referencias Externas e Inspiración Arquitectónica
+
+### USAspending Website
+- **Repo**: https://github.com/fedspendingtransparency/usaspending-website
+- **Por qué**: Plataforma similar de transparencia de gastos públicos (USA federal spending)
+- **Patrones adaptables a nuestro contexto de gasto público MEF**:
+  - Componentes de filtro reutilizables (autocomplete, checkboxes, ranges)
+  - Arquitectura Redux Toolkit para estado global (filtros + datos)
+  - API wrapper centralizado con manejo consistente de errores
+  - Custom hooks para reducir boilerplate (useApiCall, useFilters)
+  - Visualización con Recharts + D3 (componentes especializados de gasto)
+  - Patrón Container + Component para separar lógica Redux de UI
+
+- **Documentación de referencia**:
+  - `docs/inspiration-usaspending/resumen_ejecutivo.md` — estructura y patrones
+  - `docs/inspiration-usaspending/usaspending_code_examples.md` — código producción-ready
+  - `docs/inspiration-usaspending/typescript_tailwind_migration.md` — migración JS→TS, SCSS→ Tailwind
+  - `docs/inspiration-usaspending/README_PATRON_GASTO.md` — aplicación específica a P2-A gasto público
+
+- **Uso recomendado**: Al desarrollar frontend para visualización de GastoPublico.tsx (P2-A+)
+- **Status**: Consultado en sprint 21-mar-2026; documentación copiada a repo local
+
+### Otros proyectos de referencia (futuros)
+- CKAN Data Transparency UI (DTUI): posible librería de componentes reutilizables para portales públicos
+- Indicadores.uy (protocolo abierto): si se expande a más indicadores económicos
+
+## Frontend Architecture Updates (mar-21-2026)
+
+### P2-A Refactorización según patrones USAspending
+
+**Objetivo**: Mejorar reutilización de componentes y lógica para visualización de gasto público.
+
+**Implementación (Opción A - TanStack Query):**
+
+1. **API Service** — `frontend/src/services/gasto.ts`
+   - Tipificación de endpoints `/api/v1/gasto/*`
+   - Query key factory para caching
+   - Manejo consistente de errores
+
+2. **Custom Hooks** — `frontend/src/hooks/useGasto.ts`
+   - `useGasto(filters)` — acceso simplificado a todas las queries
+   - `useGastoOrganismos(anio)` — solo organismos
+   - `useGastoEjecucion(filters)` — ejecución presupuestal
+   - `useGastoComparacion(inciso)` — comparación YoY
+
+3. **Componentes Reutilizables** — `frontend/src/components/`
+   - `OrganismoFilter.tsx` — multiselect con búsqueda
+   - `AñoFilter.tsx` — selector de años
+
+**Documentación**: `docs/FRONTEND_REFACTOR_P2A.md`
+
+**Estado**: ✅ Compilando sin errores, opt-in (no breaking changes)

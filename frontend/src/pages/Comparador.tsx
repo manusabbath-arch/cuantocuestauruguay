@@ -3,25 +3,34 @@ import { useQuery } from '@tanstack/react-query'
 import { productosService, comparadorService } from '../services/productos'
 import type { Comparacion } from '../types/api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { format, parseISO, subMonths } from 'date-fns'
+import { format, parseISO, subMonths, subYears } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { trackEvent } from '../lib/analytics'
-import { Loader, AlertCircle } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import SEO from '../components/SEO'
+import ChartSkeleton from '../components/ChartSkeleton'
+import { useIsMobile } from '../hooks/useIsMobile'
+import * as Tabs from '@radix-ui/react-tabs'
 
-// Skeleton loader para gráfico
-function ChartSkeleton() {
+// ---------------------------------------------------------------------------
+// Error message
+// ---------------------------------------------------------------------------
+
+function ErrorMessage({ error }: { error: string }) {
   return (
-    <div className="h-96 bg-gradient-to-r from-gray-100 to-gray-50 rounded-lg animate-pulse flex items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <Loader className="w-8 h-8 text-gray-400 animate-spin" />
-        <p className="text-gray-500">Cargando gráfico...</p>
+    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3 mb-4">
+      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+      <div className="text-sm text-red-800">
+        <strong>Error:</strong> {error}
       </div>
     </div>
   )
 }
 
-// Skeleton para selector de productos
+// ---------------------------------------------------------------------------
+// Skeleton selector de productos
+// ---------------------------------------------------------------------------
+
 function ProductosSkeleton() {
   return (
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -38,23 +47,48 @@ function ProductosSkeleton() {
   )
 }
 
-// Error boundary para manejo de errores
-function ErrorMessage({ error }: { error: string }) {
-  return (
-    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3 mb-4">
-      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-      <div className="text-sm text-red-800">
-        <strong>Error:</strong> {error}
-      </div>
-    </div>
-  )
+// ---------------------------------------------------------------------------
+// Rangos rápidos
+// ---------------------------------------------------------------------------
+
+const QUICK_RANGES = [
+  { label: '6M', months: 6 },
+  { label: '1A', years: 1 },
+  { label: '2A', years: 2 },
+  { label: '5A', years: 5 },
+]
+
+// ---------------------------------------------------------------------------
+// Categorías disponibles (derivadas de los datos)
+// ---------------------------------------------------------------------------
+
+const CATEGORY_LABELS: Record<string, string> = {
+  combustible: 'Combustibles',
+  electricidad: 'Servicios',
+  agua: 'Servicios',
+  telecomunicaciones: 'Servicios',
+  indice: 'Índices',
 }
+
+const TABS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'combustible', label: 'Combustibles' },
+  { value: 'servicios', label: 'Servicios' },
+  { value: 'indice', label: 'Índices' },
+]
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 export default function Comparador() {
   const [selectedProductos, setSelectedProductos] = useState<number[]>([])
   const [fechaDesde, setFechaDesde] = useState(
     format(subMonths(new Date(), 6), 'yyyy-MM-dd')
   )
+  const [activeTab, setActiveTab] = useState('all')
+  const [hasAutoSelected, setHasAutoSelected] = useState(false)
+  const isMobile = useIsMobile()
 
   const { data: productos, isLoading: loadingProductos, error: productosError } = useQuery({
     queryKey: ['productos'],
@@ -68,7 +102,18 @@ export default function Comparador() {
     retry: 2,
   })
 
-  // Track comparison events via useEffect (onSuccess/onError removed in React Query v5)
+  // Preseleccionar los primeros 2 combustibles al cargar
+  useEffect(() => {
+    if (!hasAutoSelected && productos && productos.length > 0 && selectedProductos.length === 0) {
+      const combustibles = productos.filter((p) => p.categoria === 'combustible').slice(0, 2)
+      if (combustibles.length > 0) {
+        setSelectedProductos(combustibles.map((p) => p.id))
+      }
+      setHasAutoSelected(true)
+    }
+  }, [productos, hasAutoSelected, selectedProductos.length])
+
+  // Track comparison events
   const prevComparacion = useRef(comparacion)
   useEffect(() => {
     if (comparacion && comparacion !== prevComparacion.current && comparacion.datos?.length) {
@@ -105,9 +150,23 @@ export default function Comparador() {
     })
   }
 
-  useEffect(() => {
-    trackEvent('comparador_fecha_desde_cambio', { fecha_desde: fechaDesde })
-  }, [fechaDesde])
+  const handleQuickRange = (range: { months?: number; years?: number }) => {
+    const date = range.months
+      ? subMonths(new Date(), range.months)
+      : subYears(new Date(), range.years!)
+    const formatted = format(date, 'yyyy-MM-dd')
+    setFechaDesde(formatted)
+    trackEvent('comparador_fecha_desde_cambio', { fecha_desde: formatted })
+  }
+
+  // Filtrar productos según tab activo
+  const productosFiltrados = productos?.filter((p) => {
+    if (activeTab === 'all') return true
+    if (activeTab === 'servicios') {
+      return ['electricidad', 'agua', 'telecomunicaciones'].includes(p.categoria)
+    }
+    return p.categoria === activeTab
+  }) ?? []
 
   const chartData = comparacion?.datos.map((item) => ({
     fecha: format(parseISO(item.fecha), 'MMM yyyy', { locale: es }),
@@ -115,6 +174,7 @@ export default function Comparador() {
   })) || []
 
   const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
+  const chartHeight = isMobile ? 250 : 400
 
   return (
     <div className="space-y-8">
@@ -128,7 +188,7 @@ export default function Comparador() {
           Comparador de Precios
         </h1>
         <p className="text-gray-600">
-          Selecciona hasta 5 productos para comparar su evolución histórica
+          Seleccioná hasta 5 productos para comparar su evolución histórica
         </p>
       </div>
 
@@ -137,49 +197,106 @@ export default function Comparador() {
         <ErrorMessage error="Error cargando productos. Por favor intenta de nuevo." />
       )}
       {comparacionError && (
-        <ErrorMessage error="Error cargando datos de comparación. Por favor selecciona otros productos." />
+        <ErrorMessage error="Error cargando datos de comparación. Por favor seleccioná otros productos." />
       )}
 
       {/* Selector de productos */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-lg font-semibold mb-4">
-          Seleccionar Productos ({selectedProductos.length}/5)
-        </h2>
-        
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h2 className="text-lg font-semibold">
+            Seleccionar Productos ({selectedProductos.length}/5)
+          </h2>
+          {selectedProductos.length > 0 && (
+            <button
+              onClick={() => setSelectedProductos([])}
+              className="text-xs text-gray-500 hover:text-red-600 transition-colors"
+            >
+              Limpiar selección
+            </button>
+          )}
+        </div>
+
+        {/* Tabs de categoría */}
+        <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="mb-4">
+          <Tabs.List className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit flex-wrap">
+            {TABS.map((tab) => (
+              <Tabs.Trigger
+                key={tab.value}
+                value={tab.value}
+                className="px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900"
+              >
+                {tab.label}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </Tabs.Root>
+
         {loadingProductos ? (
           <ProductosSkeleton />
-        ) : productos && productos.length > 0 ? (
+        ) : productosFiltrados.length > 0 ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {productos.map((producto) => (
+            {productosFiltrados.map((producto) => (
               <button
                 key={producto.id}
                 onClick={() => handleProductoToggle(producto.id)}
                 disabled={!selectedProductos.includes(producto.id) && selectedProductos.length >= 5}
                 className={`p-3 rounded-lg border-2 text-left transition-colors ${
                   selectedProductos.includes(producto.id)
-                    ? 'border-primary bg-blue-50 text-primary'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
                     : 'border-gray-200 hover:border-gray-300'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <div className="font-medium">{producto.nombre}</div>
-                <div className="text-sm text-gray-500">{producto.categoria}</div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  {CATEGORY_LABELS[producto.categoria] ?? producto.categoria}
+                </div>
               </button>
             ))}
           </div>
         ) : (
-          <ErrorMessage error="No hay productos disponibles. Por favor carga datos primero." />
+          <p className="text-sm text-gray-500 py-4">No hay productos en esta categoría.</p>
         )}
 
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Fecha desde:
-          </label>
-          <input
-            type="date"
-            value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="border border-gray-300 rounded-lg px-4 py-2 w-full max-w-xs"
-          />
+        {/* Rangos rápidos + date picker */}
+        <div className="mt-5 flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+          <div>
+            <p className="text-xs font-medium text-gray-600 mb-2">Rango rápido:</p>
+            <div className="flex gap-2">
+              {QUICK_RANGES.map((r) => {
+                const targetDate = r.months
+                  ? format(subMonths(new Date(), r.months), 'yyyy-MM-dd')
+                  : format(subYears(new Date(), r.years!), 'yyyy-MM-dd')
+                const isActive = fechaDesde === targetDate
+                return (
+                  <button
+                    key={r.label}
+                    onClick={() => handleQuickRange(r)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">
+              Fecha desde:
+            </label>
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => {
+                setFechaDesde(e.target.value)
+                trackEvent('comparador_fecha_desde_cambio', { fecha_desde: e.target.value })
+              }}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-full max-w-xs"
+            />
+          </div>
         </div>
       </div>
 
@@ -187,23 +304,25 @@ export default function Comparador() {
       {selectedProductos.length > 0 && (
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-lg font-semibold mb-4">Comparación</h2>
-          
+
           {loadingComparacion ? (
-            <ChartSkeleton />
+            <ChartSkeleton height={chartHeight} />
           ) : chartData.length > 0 ? (
-            <Suspense fallback={<ChartSkeleton />}>
-              <ResponsiveContainer width="100%" height={400}>
+            <Suspense fallback={<ChartSkeleton height={chartHeight} />}>
+              <ResponsiveContainer width="100%" height={chartHeight}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis 
-                    dataKey="fecha" 
+                  <XAxis
+                    dataKey="fecha"
                     stroke="#6b7280"
                     style={{ fontSize: '12px' }}
+                    interval="preserveStartEnd"
                   />
-                  <YAxis 
+                  <YAxis
                     stroke="#6b7280"
                     style={{ fontSize: '12px' }}
                     tickFormatter={(value) => `$${value}`}
+                    width={isMobile ? 50 : 60}
                   />
                   <Tooltip
                     contentStyle={{
@@ -221,7 +340,7 @@ export default function Comparador() {
                       dataKey={producto.id.toString()}
                       stroke={colors[index % colors.length]}
                       strokeWidth={2}
-                      dot={{ r: 3 }}
+                      dot={false}
                       name={producto.nombre}
                     />
                   ))}
@@ -229,7 +348,7 @@ export default function Comparador() {
               </ResponsiveContainer>
             </Suspense>
           ) : (
-            <div className="h-96 flex items-center justify-center">
+            <div style={{ height: chartHeight }} className="flex items-center justify-center">
               <div className="text-gray-500">No hay datos disponibles para este rango de fechas</div>
             </div>
           )}
@@ -239,7 +358,7 @@ export default function Comparador() {
       {selectedProductos.length === 0 && (
         <div className="text-center py-12 bg-white rounded-lg shadow">
           <p className="text-gray-500">
-            Selecciona al menos un producto para comenzar la comparación
+            Seleccioná al menos un producto para comenzar la comparación
           </p>
         </div>
       )}

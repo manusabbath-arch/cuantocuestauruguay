@@ -10,8 +10,9 @@ interface LayoutProps {
 const NAV_LINKS = [
   { to: '/', label: 'Inicio' },
   { to: '/servicios', label: 'Servicios' },
-  { to: '/mi-factura', label: 'Mi Factura', highlight: true },
   { to: '/comparador', label: 'Comparador' },
+  { to: '/gasto-publico', label: 'Gasto Público' },
+  { to: '/mi-factura', label: 'Mi Factura', highlight: true },
   { to: '/sobre-nosotros', label: 'Sobre Nosotros' },
   { to: '/contacto', label: 'Contacto' },
 ]

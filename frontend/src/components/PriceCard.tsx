@@ -1,3 +1,5 @@
+import { format, isValid, parseISO } from 'date-fns'
+import { es } from 'date-fns/locale'
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react'
 import type { Producto, Variacion } from '../types/api'
 import { Link } from 'react-router-dom'
@@ -5,11 +7,12 @@ import { Link } from 'react-router-dom'
 interface PriceCardProps {
   producto: Producto
   precio?: number
+  fechaActualizacion?: string
   variacion?: Variacion
   loading?: boolean
 }
 
-export default function PriceCard({ producto, precio, variacion, loading }: PriceCardProps) {
+export default function PriceCard({ producto, precio, fechaActualizacion, variacion, loading }: PriceCardProps) {
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-md p-6 animate-pulse">
@@ -23,6 +26,9 @@ export default function PriceCard({ producto, precio, variacion, loading }: Pric
   const variacionPositiva = variacion && variacion.variacion_porcentual > 0
   const variacionNegativa = variacion && variacion.variacion_porcentual < 0
   const variacionNula = variacion && variacion.variacion_porcentual === 0
+  const fechaFormateada = fechaActualizacion
+    ? formatDateLabel(fechaActualizacion)
+    : null
 
   return (
     <Link to={`/producto/${producto.id}`} className="block">
@@ -35,12 +41,18 @@ export default function PriceCard({ producto, precio, variacion, loading }: Pric
         </div>
 
         {precio !== undefined && (
-          <div className="mb-2">
+          <div className="mb-3">
             <span className="text-3xl font-bold text-primary">
               ${precio.toFixed(2)}
             </span>
             <span className="text-gray-500 ml-2">/ {producto.unidad}</span>
           </div>
+        )}
+
+        {fechaFormateada && (
+          <p className="text-sm text-gray-500 mb-3">
+            Actualizado: {fechaFormateada}
+          </p>
         )}
 
         {variacion && (
@@ -73,4 +85,14 @@ export default function PriceCard({ producto, precio, variacion, loading }: Pric
       </div>
     </Link>
   )
+}
+
+function formatDateLabel(value: string) {
+  const parsedDate = parseISO(value)
+
+  if (!isValid(parsedDate)) {
+    return value
+  }
+
+  return format(parsedDate, 'd MMM yyyy', { locale: es })
 }
