@@ -39,19 +39,15 @@ class Settings(BaseSettings):
     BCU_COTIZACIONES_URL: str = "https://www.bcu.gub.uy/Estadisticas-e-Indicadores/Paginas/Cotizaciones.aspx"
     BCU_DOLAR_ROW_FILTER: str = "DLS. USA"
 
-    # MEF - Gasto público
-    # CSV de ejecución presupuestal por inciso publicado en CKAN MEF
+    # OPP - Gasto público (fuente primaria)
+    # CSV historico credito y ejecucion presupuestal por UE (1999-2010)
+    # Dataset: opp-historico-de-credito-y-ejecucion-presupuestal-por-ue
     CKAN_MEF_EJECUCION_URL: str = (
-        "https://catalogodatos.gub.uy/dataset/8e3b2b01-e02d-4f30-9ad3-"
-        "4aeef11e3a46/resource/fb3ad73f-de49-4b86-91b9-"
-        "5e88c5e04fd5/download/ejecucion_presupuestal_inciso.csv"
+        "http://transparenciapresupuestaria.opp.gub.uy/sites/default/files/"
+        "datos-abiertos/credito_y_ejecucion_1999_2010.csv"
     )
-    # OPP - Balance de Ejecución Presupuestal (Portal Transparencia Presupuestaria)
-    # Fuente más granular: unidad ejecutora, programa, objeto de gasto
-    # Dataset: catalogodatos.gub.uy/dataset/balance-de-ejecucion-presupuestal
-    # Nota: cada año tiene su propio archivo ZIP; esta URL apunta al CSV del año más reciente
-    OPP_BALANCE_EJECUCION_CKAN_DATASET_ID: str = "balance-de-ejecucion-presupuestal"
-    OPP_BALANCE_EJECUCION_CKAN_ORG: str = "opp"
+    # OPP CKAN - dataset ID para PresupuestoAbiertoETL (descubrimiento dinamico)
+    OPP_BALANCE_EJECUCION_CKAN_DATASET_ID: str = "opp-historico-de-credito-y-ejecucion-presupuestal-por-ue"
 
     # Scheduler
     ETL_SCHEDULE_HOUR: int = 2

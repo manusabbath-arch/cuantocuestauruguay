@@ -39,6 +39,8 @@ from app.models.models import EjecucionPresupuestal
 
 logger = logging.getLogger(__name__)
 
+_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; cuantocuestauruguay-etl/1.0)"}
+
 
 # ---------------------------------------------------------------------------
 # Heurísticas de detección de columnas
@@ -57,9 +59,31 @@ def _find_col(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
 FIELD_CANDIDATES = {
     "anio": ["ejercicio", "año", "anio", "year", "periodo"],
     "mes": ["mes", "month", "periodo_mes"],
-    "inciso": ["cod. inciso", "código inciso", "codigo inciso", "inciso_cod", "inciso cod", "cod_inciso"],
-    "nombre_organismo": ["inciso", "organismo", "nombre inciso", "nombre_organismo", "denominacion"],
-    "credito_vigente": ["crédito vigente", "credito vigente", "credito_vigente", "credito", "presupuesto vigente"],
+    "inciso": [
+        "cod. inciso",
+        "código inciso",
+        "codigo inciso",
+        "inciso_cod",
+        "inciso cod",
+        "cod_inciso",
+        "codigoinciso",
+    ],
+    "nombre_organismo": [
+        "inciso",
+        "organismo",
+        "nombre inciso",
+        "nombre_organismo",
+        "denominacion",
+        "nombreinciso",
+    ],
+    "credito_vigente": [
+        "crédito vigente",
+        "credito vigente",
+        "credito_vigente",
+        "credito",
+        "presupuesto vigente",
+        "asignacion",
+    ],
     "ejecutado": ["ejecutado", "ejecucion", "ejecución", "devengado"],
 }
 
@@ -79,13 +103,14 @@ class GastoPublicoETL:
         """Descarga el CSV de ejecución presupuestal desde CKAN MEF."""
         try:
             logger.info("Downloading MEF presupuesto CSV from %s", self.url)
-            response = requests.get(self.url, timeout=60)
+            response = requests.get(self.url, headers=_HEADERS, timeout=60)
             response.raise_for_status()
             df = pd.read_csv(
-                io.StringIO(response.text),
+                io.BytesIO(response.content),
                 sep=None,
                 engine="python",
                 dtype=str,
+                encoding="utf-8-sig",
                 encoding_errors="replace",
             )
             logger.info("Extracted %d rows from MEF CSV", len(df))
@@ -269,7 +294,7 @@ class PresupuestoAbiertoETL:
         """Retorna la lista de recursos del dataset OPP via CKAN API."""
         url = f"{self.CKAN_API_URL}/package_show"
         try:
-            resp = requests.get(url, params={"id": self.DATASET_ID}, timeout=30)
+            resp = requests.get(url, params={"id": self.DATASET_ID}, headers=_HEADERS, timeout=30)
             resp.raise_for_status()
             data = resp.json()
             if not data.get("success"):
@@ -330,7 +355,7 @@ class PresupuestoAbiertoETL:
         logger.info("Downloading OPP presupuesto resource: %s (format=%s)", url, fmt)
 
         try:
-            resp = requests.get(url, timeout=120)
+            resp = requests.get(url, headers=_HEADERS, timeout=120)
             resp.raise_for_status()
         except Exception as exc:
             logger.error("Error downloading OPP resource %s: %s", url, exc)
