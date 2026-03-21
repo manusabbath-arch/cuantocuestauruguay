@@ -183,9 +183,33 @@ Modelo:
 
 Estado:
 - ETL implementado con detección dinámica de columnas y limpieza numérica
-- Router gasto.py con 3 endpoints (organismos, ejecución, comparación YoY)
-- Scheduler mensual activo (día 1 a las 03:30 UTC)
-- Frontend pendiente (GastoPublico.tsx no existe)
+- Router gasto.py con endpoints: organismos, ejecución, comparación YoY, narrativa, anomalías, exportación CSV
+- Scheduler mensual activo (día 1 a las 03:30 UTC); post-ETL dispara detección de anomalías
+- Frontend GastoPublico.tsx implementado con narrativa, anomalías, drilldown y botón de descarga CSV
+- Detección de anomalías: backend/app/services/analytics.py → tabla anomalias_presupuestales
+- Narrativa automática determinista: backend/app/services/narrativa.py
+- Watchdog de fuentes ETL: backend/app/services/watchdog.py
+
+### Indicadores Macro
+Archivo:
+- backend/app/etl/macro_contexto.py
+
+Fuentes (MIDES/CKAN, verificadas con descarga real):
+- ISR (Índice de Salario Real) — resource: 805066d4-35a5-4aa4-9fb1-c7d402ebfb85 — 1996–2018
+- PIB por industrias (industrial, agropecuario, construcción, servicios) — resource: 856107dd-8b2a-4b3d-b6ec-62c959c2c5f0 — 2005–2018
+
+Advertencia: datos llegan hasta 2018. Mostrar en frontend con nota de cobertura histórica.
+
+Modelo:
+- IndicadorMacro (tabla indicadores_macro)
+- Campos: codigo, nombre, anio, valor, unidad, fuente
+- unique constraint por (codigo, anio)
+
+Estado:
+- ETL implementado con upsert
+- Router macro.py: GET /api/v1/macro/codigos, /indicadores, /indicadores/export.csv, POST /etl/run
+- Scheduler mensual activo (día 2 a las 04:00 UTC, después del gasto)
+- Tests: backend/tests/test_macro_contexto_etl.py (13 tests)
 
 ---
 
@@ -195,10 +219,12 @@ Archivo:
 - backend/app/services/scheduler.py
 
 Jobs:
-- combustibles: lote diario
-- utilities: lote semanal (día configurable) desplazado respecto a combustibles
-- índices: lote diario desplazado respecto a utilities
-- gasto público: lote mensual (día 1 a las 03:30 UTC)
+- combustibles: lote diario (02:00 UTC)
+- utilities: lote semanal (día configurable, +30min offset)
+- índices: lote diario (+60min offset)
+- gasto público: lote mensual (día 1 a las 03:30 UTC) + detección de anomalías post-ETL
+- macro contexto: lote mensual (día 2 a las 04:00 UTC)
+- watchdog: diario a las 06:00 UTC
 
 Notas:
 - el scheduler dispara alertas por excepción, tiempos largos, cargas parciales y cero registros
@@ -219,7 +245,23 @@ Precio:
 - fuente
 - unique constraint por producto_id + fecha
 
-Categorías usadas/esperadas:
+EjecucionPresupuestal:
+- anio, mes (nullable=total anual), inciso, nombre_organismo
+- credito_vigente, ejecutado, fuente
+- unique: (anio, mes, inciso)
+
+AnomaliaPresupuestal:
+- anio, mes, inciso, nombre_organismo
+- tipo: ejecucion_baja | variacion_atipica | dato_faltante
+- severidad: CRITICA | ALTA | MEDIA | BAJA
+- descripcion, valor_observado, valor_umbral, detectado_en
+- unique: (anio, mes, inciso, tipo)
+
+IndicadorMacro:
+- codigo, nombre, anio, valor, unidad, fuente
+- unique: (codigo, anio)
+
+Categorías usadas/esperadas en Producto:
 - combustible
 - indice
 - utilities puede convivir con nombres de categoría históricos según datos ya cargados
@@ -249,6 +291,20 @@ Gasto público:
 - GET /api/v1/gasto/organismos
 - GET /api/v1/gasto/ejecucion
 - GET /api/v1/gasto/comparacion-anual
+- GET /api/v1/gasto/narrativa
+- GET /api/v1/gasto/anomalias
+- POST /api/v1/gasto/anomalias/detectar
+- GET /api/v1/gasto/ejecucion/export.csv
+- GET /api/v1/gasto/anomalias/export.csv
+
+Precios (export):
+- GET /api/v1/precios/export.csv
+
+Indicadores macro:
+- GET /api/v1/macro/codigos
+- GET /api/v1/macro/indicadores
+- GET /api/v1/macro/indicadores/export.csv
+- POST /api/v1/macro/etl/run
 
 App:
 - GET /

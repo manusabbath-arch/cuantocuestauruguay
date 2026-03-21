@@ -15,6 +15,9 @@ import {
   type EjecucionPresupuestal,
   type ComparacionAnual,
   type GastoFilters,
+  type NarrativaGasto,
+  type AnomaliaPresupuestal,
+  type AnomaliaFilters,
 } from '../services/gasto'
 
 // ---------------------------------------------------------------------------
@@ -129,12 +132,14 @@ export function useGastoOrganismos(anio?: number) {
  * const { data, isLoading } = useGastoEjecucion({ anio: 2023, inciso: '05' })
  */
 export function useGastoEjecucion(filters: GastoFilters = {}) {
+  const hasDefinedFilter = Object.values(filters).some((value) => value !== undefined && value !== null)
+
   return useQuery({
     queryKey: gastoQueryKeys.ejecucionWithFilters(filters),
     queryFn: () => gastoService.getEjecucion(filters),
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 15,
-    enabled: !!filters.anio || Object.keys(filters).length === 0,
+    enabled: Object.keys(filters).length === 0 || hasDefinedFilter,
   })
 }
 
@@ -156,5 +161,33 @@ export function useGastoComparacion(inciso?: string) {
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
     enabled: !!inciso,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// useGastoNarrativa Hook - Narrativa automatica del año
+// ---------------------------------------------------------------------------
+
+export function useGastoNarrativa(anio?: number): import('@tanstack/react-query').UseQueryResult<NarrativaGasto, Error> {
+  return useQuery({
+    queryKey: gastoQueryKeys.narrativaByAnio(anio),
+    queryFn: () => gastoService.getNarrativa(anio),
+    staleTime: 1000 * 60 * 60,
+    gcTime: 1000 * 60 * 120,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// useGastoAnomalias Hook
+// ---------------------------------------------------------------------------
+
+export function useGastoAnomalias(
+  filters: AnomaliaFilters = {}
+): import('@tanstack/react-query').UseQueryResult<AnomaliaPresupuestal[], Error> {
+  return useQuery({
+    queryKey: gastoQueryKeys.anomaliasWithFilters(filters),
+    queryFn: () => gastoService.getAnomalias(filters),
+    staleTime: 1000 * 60 * 60,
+    gcTime: 1000 * 60 * 120,
   })
 }

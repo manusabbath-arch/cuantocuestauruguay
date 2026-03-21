@@ -53,6 +53,7 @@ def _make_etl(csv_text: str = CSV_STANDARD, db=None) -> GastoPublicoETL:
 def _mock_response(csv_text: str):
     mock = MagicMock()
     mock.text = csv_text
+    mock.content = csv_text.encode("utf-8")
     mock.status_code = 200
     mock.raise_for_status = MagicMock()
     return mock
@@ -61,6 +62,7 @@ def _mock_response(csv_text: str):
 # ---------------------------------------------------------------------------
 # _find_col
 # ---------------------------------------------------------------------------
+
 
 class TestFindCol:
     def test_exact_match(self):
@@ -84,6 +86,7 @@ class TestFindCol:
 # ---------------------------------------------------------------------------
 # Extract
 # ---------------------------------------------------------------------------
+
 
 class TestExtract:
     @pytest.mark.anyio
@@ -114,6 +117,7 @@ class TestExtract:
 # ---------------------------------------------------------------------------
 # Transform
 # ---------------------------------------------------------------------------
+
 
 class TestTransform:
     @pytest.mark.anyio
@@ -189,6 +193,7 @@ class TestTransform:
 # Load
 # ---------------------------------------------------------------------------
 
+
 class TestLoad:
     @pytest.mark.anyio
     async def test_load_inserts_new_record(self):
@@ -196,11 +201,19 @@ class TestLoad:
         # Simular que no existe en DB
         etl.db.query.return_value.filter.return_value.first.return_value = None
 
-        df = pd.DataFrame([{
-            "anio": 2023, "mes": 1, "inciso": "02",
-            "nombre_organismo": "MEF", "credito_vigente": 1000000.0,
-            "ejecutado": 850000.0, "fuente": "test",
-        }])
+        df = pd.DataFrame(
+            [
+                {
+                    "anio": 2023,
+                    "mes": 1,
+                    "inciso": "02",
+                    "nombre_organismo": "MEF",
+                    "credito_vigente": 1000000.0,
+                    "ejecutado": 850000.0,
+                    "fuente": "test",
+                }
+            ]
+        )
 
         count = await etl.load(df)
         assert count == 1
@@ -213,11 +226,19 @@ class TestLoad:
         existing = MagicMock()
         etl.db.query.return_value.filter.return_value.first.return_value = existing
 
-        df = pd.DataFrame([{
-            "anio": 2023, "mes": 1, "inciso": "02",
-            "nombre_organismo": "MEF actualizado", "credito_vigente": 1100000.0,
-            "ejecutado": 900000.0, "fuente": "test",
-        }])
+        df = pd.DataFrame(
+            [
+                {
+                    "anio": 2023,
+                    "mes": 1,
+                    "inciso": "02",
+                    "nombre_organismo": "MEF actualizado",
+                    "credito_vigente": 1100000.0,
+                    "ejecutado": 900000.0,
+                    "fuente": "test",
+                }
+            ]
+        )
 
         count = await etl.load(df)
         assert count == 0  # no inserciones nuevas, solo update
@@ -236,11 +257,19 @@ class TestLoad:
         etl = _make_etl()
         etl.db.query.return_value.filter.return_value.first.return_value = None
 
-        df = pd.DataFrame([{
-            "anio": 2023, "mes": None, "inciso": "10",
-            "nombre_organismo": "ANTEL", "credito_vigente": 500000.0,
-            "ejecutado": 400000.0, "fuente": "test",
-        }])
+        df = pd.DataFrame(
+            [
+                {
+                    "anio": 2023,
+                    "mes": None,
+                    "inciso": "10",
+                    "nombre_organismo": "ANTEL",
+                    "credito_vigente": 500000.0,
+                    "ejecutado": 400000.0,
+                    "fuente": "test",
+                }
+            ]
+        )
 
         count = await etl.load(df)
         assert count == 1
@@ -249,6 +278,7 @@ class TestLoad:
 # ---------------------------------------------------------------------------
 # Run (flujo completo)
 # ---------------------------------------------------------------------------
+
 
 class TestRun:
     @pytest.mark.anyio

@@ -10,7 +10,10 @@ from app.etl.alerts import alert_manager
 from app.etl.combustibles import CombustiblesETL
 from app.etl.gasto_publico import GastoPublicoETL
 from app.etl.indices import IndicesETL
+from app.etl.macro_contexto import MacroContextoETL
 from app.etl.utilities import UtilitiesETL
+from app.services.analytics import run_deteccion
+from app.services.watchdog import run_watchdog
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,39 @@ class ETLScheduler:
     def _offset_schedule(offset_minutes: int) -> tuple[int, int]:
         total_minutes = (settings.ETL_SCHEDULE_HOUR * 60) + settings.ETL_SCHEDULE_MINUTE + offset_minutes
         return (total_minutes // 60) % 24, total_minutes % 60
+
+    async def run_watchdog_job(self):
+        """Job diario que verifica la salud de todas las fuentes ETL."""
+        logger.info("Starting scheduled watchdog job")
+        db = SessionLocal()
+        try:
+            result = run_watchdog(db)
+            estado = result.get("estado_general", "ok")
+            resumen = result.get("resumen", {})
+            logger.info(
+                f"Watchdog completed: estado={estado} "
+                f"ok={resumen.get('ok')} warn={resumen.get('warn')} error={resumen.get('error')}"
+            )
+            if estado == "error":
+                alert_manager.send_alert(
+                    alert_type="watchdog_error",
+                    etl_name="Watchdog",
+                    message=f"Watchdog detected {resumen.get('error')} source(s) in error state.",
+                    context=resumen,
+                    severity="error",
+                )
+            elif estado == "warn":
+                alert_manager.send_alert(
+                    alert_type="watchdog_warn",
+                    etl_name="Watchdog",
+                    message=f"Watchdog detected {resumen.get('warn')} source(s) with warnings.",
+                    context=resumen,
+                    severity="warning",
+                )
+        except Exception as e:
+            logger.error(f"Error in scheduled watchdog job: {e}")
+        finally:
+            db.close()
 
     async def run_combustibles_job(self):
         """Job que ejecuta el ETL de combustibles"""
@@ -58,8 +94,25 @@ class ETLScheduler:
         finally:
             db.close()
 
+    async def run_macro_job(self):
+        """Job mensual que actualiza los indicadores macroeconómicos de contexto."""
+        logger.info("Starting scheduled macro contexto ETL job")
+        db = SessionLocal()
+        start_time = time.monotonic()
+        try:
+            etl = MacroContextoETL(db)
+            result = await etl.run()
+            logger.info(f"Macro contexto ETL job completed: {result}")
+            self._process_etl_result("MacroContexto", result, time.monotonic() - start_time)
+        except Exception as e:
+            logger.error(f"Error in scheduled macro contexto ETL job: {e}")
+            alert_manager.alert_etl_failure("MacroContexto", e, time.monotonic() - start_time)
+        finally:
+            db.close()
+
     async def run_gasto_job(self):
-        """Job mensual que ejecuta el ETL de ejecución presupuestal del MEF"""
+        """Job mensual que ejecuta el ETL de ejecución presupuestal del MEF
+        y luego dispara la detección de anomalías sobre los datos actualizados."""
         logger.info("Starting scheduled gasto público ETL job")
         db = SessionLocal()
         start_time = time.monotonic()
@@ -68,6 +121,13 @@ class ETLScheduler:
             result = await etl.run()
             logger.info(f"Gasto público ETL job completed: {result}")
             self._process_etl_result("GastoPublico", result, time.monotonic() - start_time)
+
+            if result.get("success"):
+                try:
+                    detection = run_deteccion(db)
+                    logger.info(f"Anomaly detection completed: {detection}")
+                except Exception as det_err:
+                    logger.error(f"Anomaly detection failed (non-blocking): {det_err}")
         except Exception as e:
             logger.error(f"Error in scheduled gasto público ETL job: {e}")
             alert_manager.alert_etl_failure("GastoPublico", e, time.monotonic() - start_time)
@@ -178,12 +238,32 @@ class ETLScheduler:
             replace_existing=True,
         )
 
+        # ETL de indicadores macro mensual el dia 2 a las 4:00 AM (despues del gasto)
+        self.scheduler.add_job(
+            self.run_macro_job,
+            CronTrigger(day=2, hour=4, minute=0),
+            id="monthly_macro_etl",
+            name="Monthly ETL for macro indicators (ISR, PIB sectorial)",
+            replace_existing=True,
+        )
+
+        # Watchdog diario a las 6:00 AM (luego de todos los ETLs nocturnos)
+        self.scheduler.add_job(
+            self.run_watchdog_job,
+            CronTrigger(hour=6, minute=0),
+            id="daily_watchdog",
+            name="Daily ETL source health watchdog",
+            replace_existing=True,
+        )
+
         self.scheduler.start()
         logger.info(
             f"Scheduler started - Combustibles ETL at {settings.ETL_SCHEDULE_HOUR}:{settings.ETL_SCHEDULE_MINUTE:02d}, "
             f"Utilities ETL on {settings.ETL_UTILITIES_DAY_OF_WEEK} at {utilities_hour}:{utilities_minute:02d}, "
             f"Indices ETL at {indices_hour}:{indices_minute:02d}, "
-            f"Gasto publico ETL monthly day=1 at 03:30"
+            f"Gasto publico ETL monthly day=1 at 03:30, "
+            f"Macro ETL monthly day=2 at 04:00, "
+            f"Watchdog daily at 06:00"
         )
 
     def stop(self):

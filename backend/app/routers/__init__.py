@@ -2,6 +2,7 @@
 from .etl import router as etl_router
 from .facturas import router as facturas_router
 from .gasto import router as gasto_router
+from .macro import router as macro_router
 from .precios import router as precios_router
 
-__all__ = ["precios_router", "etl_router", "facturas_router", "gasto_router"]
+__all__ = ["precios_router", "etl_router", "facturas_router", "gasto_router", "macro_router"]

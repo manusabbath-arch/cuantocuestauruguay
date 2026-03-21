@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     # OPP CKAN - dataset ID para PresupuestoAbiertoETL (descubrimiento dinamico)
     OPP_BALANCE_EJECUCION_CKAN_DATASET_ID: str = "opp-historico-de-credito-y-ejecucion-presupuestal-por-ue"
 
+    # Indicadores macro (MIDES/CKAN)
+    # Índice de Salario Real (ISR) — base 2008=100, anual 1996–2018
+    CKAN_ISR_RESOURCE_ID: str = "805066d4-35a5-4aa4-9fb1-c7d402ebfb85"
+    # PIB por industrias en miles de pesos constantes 2005, anual 2005–2018
+    CKAN_PIB_INDUSTRIAS_RESOURCE_ID: str = "856107dd-8b2a-4b3d-b6ec-62c959c2c5f0"
+
     # Scheduler
     ETL_SCHEDULE_HOUR: int = 2
     ETL_SCHEDULE_MINUTE: int = 0

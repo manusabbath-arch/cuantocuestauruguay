@@ -12,6 +12,7 @@ from app.etl.gasto_publico import GastoPublicoETL, PresupuestoAbiertoETL
 from app.etl.indices import IndicesETL
 from app.etl.utilities import TARIFF_HISTORY, UtilitiesETL
 from app.models.models import Precio, Producto
+from app.services.watchdog import run_watchdog
 
 router = APIRouter(prefix="/api/v1/etl", tags=["etl"])
 
@@ -176,6 +177,18 @@ async def obtener_estadisticas_bd(db: Session = Depends(get_db)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas: {str(e)}")
+
+
+@router.get("/watchdog")
+async def obtener_watchdog(db: Session = Depends(get_db)):
+    """
+    Ejecuta checks de salud sobre todas las fuentes ETL y retorna estado consolidado.
+    Checks: silencio (N dias sin datos), rango (valor fuera de historico), tariff_stale.
+    """
+    try:
+        return run_watchdog(db)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error ejecutando watchdog: {str(e)}")
 
 
 @router.get("/alerts")

@@ -1,9 +1,12 @@
+import csv
+import io
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from time import time
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
@@ -268,3 +271,66 @@ async def obtener_estadisticas(
         "fecha_desde": fecha_desde,
         "fecha_hasta": fecha_hasta,
     }
+
+
+# --------------------------------------------------------------------------
+# Exportación CSV
+# --------------------------------------------------------------------------
+
+
+@router.get("/precios/export.csv")
+async def exportar_precios_csv(
+    categoria: Optional[str] = None,
+    producto_id: Optional[int] = None,
+    fecha_desde: Optional[date] = None,
+    fecha_hasta: Optional[date] = None,
+    limit: int = Query(10000, le=50000),
+    db: Session = Depends(get_db),
+):
+    """
+    Exporta serie histórica de precios como CSV descargable.
+    Filtrable por categoría, producto_id y rango de fechas.
+    """
+    query = (
+        db.query(Precio, Producto).join(Producto, Precio.producto_id == Producto.id).filter(Producto.activo.is_(True))
+    )
+    if producto_id:
+        query = query.filter(Precio.producto_id == producto_id)
+    if categoria:
+        query = query.filter(Producto.categoria == categoria)
+    if fecha_desde:
+        query = query.filter(Precio.fecha >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(Precio.fecha <= fecha_hasta)
+
+    rows = query.order_by(Producto.nombre, Precio.fecha.desc()).limit(limit).all()
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="Sin datos para exportar")
+
+    data = [
+        {
+            "producto_id": precio.producto_id,
+            "producto": producto.nombre,
+            "categoria": producto.categoria,
+            "unidad": producto.unidad,
+            "fecha": precio.fecha.isoformat(),
+            "valor": float(precio.valor),
+            "fuente": precio.fuente or "",
+        }
+        for precio, producto in rows
+    ]
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=data[0].keys())
+    writer.writeheader()
+    writer.writerows(data)
+    output.seek(0)
+
+    tag = categoria or (f"producto_{producto_id}" if producto_id else "todos")
+    fname = f"precios_{tag}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
