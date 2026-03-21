@@ -8,6 +8,8 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.etl.alerts import alert_manager
 from app.etl.combustibles import CombustiblesETL
+from app.etl.gasto_publico import GastoPublicoETL, PresupuestoAbiertoETL
+from app.etl.indices import IndicesETL
 from app.etl.utilities import TARIFF_HISTORY, UtilitiesETL
 from app.models.models import Precio, Producto
 
@@ -63,6 +65,43 @@ async def ejecutar_utilities_etl(
         raise HTTPException(status_code=500, detail=f"Error ejecutando utilities ETL: {str(e)}")
 
 
+@router.post("/indices/run", dependencies=[Depends(verify_etl_api_key)])
+async def ejecutar_indices_etl(db: Session = Depends(get_db)):
+    """Ejecuta el proceso ETL de índices económicos."""
+    try:
+        etl = IndicesETL(db)
+        return await etl.run()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error ejecutando índices ETL: {str(e)}")
+
+
+@router.post("/gasto/run", dependencies=[Depends(verify_etl_api_key)])
+async def ejecutar_gasto_etl(db: Session = Depends(get_db)):
+    """Ejecuta el proceso ETL de ejecución presupuestal del MEF."""
+    try:
+        etl = GastoPublicoETL(db)
+        return await etl.run()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error ejecutando gasto público ETL: {str(e)}")
+
+
+@router.post("/gasto/opp/run", dependencies=[Depends(verify_etl_api_key)])
+async def ejecutar_presupuesto_abierto_etl(
+    anio: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    """Ejecuta el ETL complementario usando el dataset OPP (Portal Presupuesto Abierto).
+
+    Parametro opcional `anio` para descargar datos de un anio especifico.
+    Sin parametro usa el recurso mas reciente disponible en CKAN OPP.
+    """
+    try:
+        etl = PresupuestoAbiertoETL(db)
+        return await etl.run(anio=anio)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error ejecutando OPP ETL: {str(e)}")
+
+
 @router.post("/run-all", dependencies=[Depends(verify_etl_api_key)])
 async def ejecutar_todo_etl(db: Session = Depends(get_db)):
     """Ejecuta todos los procesos ETL (combustibles + utilities)"""
@@ -74,6 +113,12 @@ async def ejecutar_todo_etl(db: Session = Depends(get_db)):
 
         utilities_etl = UtilitiesETL(db)
         results["utilities"] = await utilities_etl.run_all()
+
+        indices_etl = IndicesETL(db)
+        results["indices"] = await indices_etl.run()
+
+        gasto_etl = GastoPublicoETL(db)
+        results["gasto_publico"] = await gasto_etl.run()
 
         return {"success": True, "message": "All ETL processes completed", "results": results}
     except Exception as e:
@@ -104,7 +149,7 @@ async def obtener_estado():
         return {
             "scheduler_running": True,
             "jobs": jobs_info,
-            "available_services": ["combustibles", "ute", "ose", "antel"],
+            "available_services": ["combustibles", "indices", "ute", "ose", "antel", "gasto_publico"],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo estado: {str(e)}")

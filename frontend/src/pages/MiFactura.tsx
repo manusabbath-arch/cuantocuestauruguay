@@ -130,8 +130,8 @@ export default function MiFactura() {
       billHistory.save(data)
       trackEvent('bill_analyzed', { servicio: data.servicio, consumo: data.consumo.valor })
     },
-    onError: (error: any) => {
-      const detail = error?.response?.data?.detail || 'Error al procesar la factura. Intentá de nuevo.'
+    onError: (error: unknown) => {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Error al procesar la factura. Intentá de nuevo.'
       trackEvent('bill_analysis_error', { error: detail })
     },
   })
@@ -159,7 +159,7 @@ export default function MiFactura() {
   }
 
   const errorMessage = mutation.error
-    ? (mutation.error as any)?.response?.data?.detail || 'Error al procesar la factura. Intentá de nuevo.'
+    ? (mutation.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Error al procesar la factura. Intentá de nuevo.'
     : null
 
   return (

@@ -149,13 +149,46 @@ class ETLAlert:
 
     def _send_email_alert(self, alert_data: Dict[str, Any]) -> bool:
         """
-        Enviar alerta por email (requiere SMTP configurado).
-        Por ahora es un placeholder para usar en futuro.
+        Enviar alerta por email usando SMTP si está configurado.
         """
-        # TODO: Implementar envío de email con SMTP
-        # Requiere variables en .env: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD
-        logger.debug(f"Email alert would be sent: {alert_data}")
-        return False
+        if not settings.ALERT_EMAIL_TO or not settings.SMTP_HOST:
+            logger.warning("Email alerting is enabled but SMTP configuration is incomplete")
+            return False
+
+        try:
+            message = MIMEMultipart()
+            message["Subject"] = f"[PreciosRegulados ETL] {alert_data['severity'].upper()} - {alert_data['etl']}"
+            message["From"] = settings.SMTP_FROM_EMAIL or settings.SMTP_USER or "alerts@localhost"
+            message["To"] = settings.ALERT_EMAIL_TO
+
+            context_lines = [f"{key}: {value}" for key, value in alert_data.get("context", {}).items()]
+            body = "\n".join(
+                [
+                    f"Timestamp: {alert_data['timestamp']}",
+                    f"ETL: {alert_data['etl']}",
+                    f"Severity: {alert_data['severity']}",
+                    f"Type: {alert_data['type']}",
+                    "",
+                    alert_data["message"],
+                    "",
+                    "Context:",
+                    *context_lines,
+                ]
+            )
+            message.attach(MIMEText(body, "plain", "utf-8"))
+
+            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as smtp:
+                if settings.SMTP_USE_TLS:
+                    smtp.starttls()
+                if settings.SMTP_USER:
+                    smtp.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                smtp.sendmail(message["From"], [settings.ALERT_EMAIL_TO], message.as_string())
+
+            logger.info("ETL alert email sent successfully")
+            return True
+        except Exception as exc:
+            logger.error(f"Failed to send ETL alert email: {exc}")
+            return False
 
     def get_recent_alerts(self, limit: int = 10) -> list:
         """Obtener alertas recientes"""
@@ -182,4 +215,4 @@ class ETLAlert:
 
 
 # Instancia global de alertas
-alert_manager = ETLAlert(email_enabled=False)
+alert_manager = ETLAlert(email_enabled=settings.ALERT_EMAIL_ENABLED)

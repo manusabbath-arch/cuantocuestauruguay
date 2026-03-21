@@ -15,8 +15,11 @@ import re
 from datetime import date
 from pathlib import Path
 from typing import Dict, List, Optional
+from urllib.parse import urljoin, urlparse
 
 import pdfplumber
+import requests
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
@@ -410,3 +413,89 @@ def list_pdfs_in_directory(dir_path: str) -> List[str]:
         return []
 
     return [str(p) for p in path.glob("*.pdf")]
+
+
+def discover_latest_pdf_url(page_url: str, preferred_keywords: Optional[List[str]] = None) -> Optional[str]:
+    """
+    Descubre la URL del PDF más relevante en una página HTML.
+
+    La selección usa un score heurístico por palabras clave + año detectado en URL/texto.
+    """
+    try:
+        response = requests.get(page_url, timeout=20)
+        response.raise_for_status()
+    except Exception as exc:
+        logger.warning(f"Failed to fetch URSEA page {page_url}: {exc}")
+        return None
+
+    soup = BeautifulSoup(response.text, "lxml")
+    candidates = []
+    preferred_keywords = [kw.lower() for kw in (preferred_keywords or [])]
+
+    for anchor in soup.find_all("a", href=True):
+        href = anchor.get("href", "")
+        if ".pdf" not in href.lower():
+            continue
+
+        absolute_url = urljoin(page_url, href)
+        link_text = (anchor.get_text(" ", strip=True) or "").lower()
+        full_text = f"{absolute_url.lower()} {link_text}"
+
+        # Peso por palabras clave preferidas del servicio.
+        keyword_score = sum(3 for kw in preferred_keywords if kw and kw in full_text)
+
+        # Señales genéricas de documento tarifario.
+        generic_keywords = ["tarifa", "pliego", "regimen", "cuadro", "precio"]
+        generic_score = sum(1 for kw in generic_keywords if kw in full_text)
+
+        # Prioriza URLs con año más reciente cuando exista.
+        years = [int(y) for y in re.findall(r"20\d{2}", full_text)]
+        latest_year = max(years) if years else 0
+
+        candidates.append((keyword_score + generic_score, latest_year, absolute_url))
+
+    if not candidates:
+        logger.warning(f"No PDF links found on {page_url}")
+        return None
+
+    # Mayor score, luego año más reciente.
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    selected = candidates[0][2]
+    logger.info(f"Selected PDF candidate from {page_url}: {selected}")
+    return selected
+
+
+def download_pdf(pdf_url: str, destination_dir: str, filename_prefix: str) -> Optional[str]:
+    """Descarga un PDF y lo guarda en destination_dir con nombre determinístico."""
+    try:
+        response = requests.get(pdf_url, timeout=30)
+        response.raise_for_status()
+
+        destination = Path(destination_dir)
+        destination.mkdir(parents=True, exist_ok=True)
+
+        parsed = urlparse(pdf_url)
+        basename = Path(parsed.path).name or f"{filename_prefix}.pdf"
+        if not basename.lower().endswith(".pdf"):
+            basename = f"{filename_prefix}.pdf"
+
+        file_path = destination / basename
+        file_path.write_bytes(response.content)
+        logger.info(f"Downloaded PDF to {file_path}")
+        return str(file_path)
+    except Exception as exc:
+        logger.warning(f"Failed to download PDF {pdf_url}: {exc}")
+        return None
+
+
+def discover_and_download_latest_pdf(
+    page_url: str,
+    destination_dir: str,
+    filename_prefix: str,
+    preferred_keywords: Optional[List[str]] = None,
+) -> Optional[str]:
+    """Descubre y descarga el PDF más relevante de una página fuente."""
+    pdf_url = discover_latest_pdf_url(page_url, preferred_keywords=preferred_keywords)
+    if not pdf_url:
+        return None
+    return download_pdf(pdf_url, destination_dir, filename_prefix)

@@ -1,341 +1,329 @@
-# Contexto del Proyecto - PreciosRegulados.uy
+# Project Context - CuantoCuestaUruguay
 
-Este archivo proporciona contexto adicional para asistentes de IA sobre el proyecto.
+Este es el documento canónico de contexto para asistentes de IA en este repo.
 
-## 🎯 Objetivo del Proyecto
-Plataforma web para consultar y comparar precios regulados en Uruguay (combustibles, servicios públicos e índices económicos) con datos oficiales actualizados.
+Objetivo:
+- Dar a Copilot, Claude y cualquier otro asistente un único lugar desde donde leer el estado real del proyecto.
+- Evitar duplicación de instrucciones, decisiones inconsistentes y trabajo paralelo sobre supuestos incorrectos.
 
-## 🏗️ Arquitectura
+Regla principal:
+- Si este archivo contradice documentos aspiracionales o reportes viejos, prevalece el código.
 
-### Frontend
-- **Framework**: React 18 + TypeScript
-- **Build Tool**: Vite
-- **Estilos**: TailwindCSS
-- **Routing**: React Router v6
-- **State Management**: React Query (TanStack Query)
-- **Icons**: Lucide React
-- **Deploy**: Cloudflare Pages
+Orden de prioridad para entender el proyecto:
+1. Código real en backend/app y frontend/src
+2. Este archivo
+3. ROADMAP.md
+4. README.md
+5. Documentos históricos o reportes de migración
 
-### Backend
-- **Framework**: FastAPI (Python 3.11+)
-- **ORM**: SQLAlchemy
-- **Base de Datos**: PostgreSQL (producción), SQLite (desarrollo)
-- **Validación**: Pydantic
-- **Deploy**: Render.com
+## Estado actual
 
-### ETL (Extract, Transform, Load)
-- **Scheduler**: APScheduler
-- **Fuentes de Datos**:
-  - ANCAP (combustibles)
-  - UTE (electricidad)
-  - OSE (agua)
-  - Antel (telecomunicaciones)
-  - Catálogo de Datos Abiertos (catalogodatos.gub.uy)
+Proyecto:
+- Plataforma web para consultar precios regulados en Uruguay y expandirse a gasto público e indicadores.
 
-## 📂 Estructura de Directorios
+Estado real al 21 de marzo de 2026:
+- Combustibles: implementado y operativo
+- Utilities UTE/OSE/Antel: implementado pero con dependencia fuerte de TARIFF_HISTORY hardcodeado
+- Índices económicos: IPC y dólar BCU implementados recientemente en un ETL dedicado
+- Gasto público: ETL + modelo + endpoints + frontend implementados; fuentes CKAN MEF CSV y OPP CKAN; scheduler mensual activo
+- Inmobiliario: no implementado en este repo
 
-```
-cuantocuestauruguay/
-├── frontend/                 # React + Vite + TypeScript
-│   ├── src/
-│   │   ├── components/      # Componentes reutilizables
-│   │   ├── pages/           # Páginas principales
-│   │   │   ├── Home.tsx
-│   │   │   ├── Servicios.tsx
-│   │   │   ├── Comparador.tsx
-│   │   │   ├── ProductoDetalle.tsx
-│   │   │   ├── About.tsx
-│   │   │   ├── SobreNosotros.tsx
-│   │   │   └── Contacto.tsx
-│   │   ├── services/        # API clients
-│   │   └── types/           # TypeScript types
-│   ├── public/              # Assets estáticos
-│   └── index.html           # Entry point (con Google Analytics)
-│
-├── backend/                  # FastAPI + Python
-│   ├── app/
-│   │   ├── api/             # Endpoints REST
-│   │   ├── core/            # Config, database, feature flags
-│   │   ├── etl/             # ETL processes
-│   │   │   ├── combustibles_v2.py
-│   │   │   ├── ute_v2.py
-│   │   │   ├── ose_v2.py
-│   │   │   ├── antel_v2.py
-│   │   │   └── utilities.py
-│   │   ├── models/          # SQLAlchemy models
-│   │   └── schemas/         # Pydantic schemas
-│   └── tests/               # Unit & integration tests
-│
-├── scripts/                  # Utilidades y mantenimiento
-│   ├── init_db.py
-│   ├── load_historical.py
-│   ├── check_db.py
-│   └── arch002_*.py         # Scripts de monitoreo ARCH-002
-│
-└── docs/                     # Documentación adicional
-```
+Advertencia importante:
+- ARCH-002_COMPLETION_REPORT.txt y parte del README describen una arquitectura v2/shared packages que no coincide con el código actual.
+- No asumir que existen ETLBase, shadow mode, feature flags v2 o archivos *_v2 sólo porque aparecen en documentación histórica.
 
-## 🔧 Convenciones de Código
+## Fuente de verdad por tema
 
-### Frontend (TypeScript)
-- **Componentes**: PascalCase (ej: `ProductoCard.tsx`)
-- **Hooks**: camelCase con prefijo `use` (ej: `useProductos`)
-- **Estilos**: TailwindCSS utility classes
-- **Exports**: Named exports para componentes
-- **Props**: Interfaces con sufijo `Props` (ej: `LayoutProps`)
+Arquitectura backend real:
+- backend/app/main.py
+- backend/app/routers/
+- backend/app/services/scheduler.py
+- backend/app/etl/
 
-### Backend (Python)
-- **Files**: snake_case (ej: `combustibles_v2.py`)
-- **Classes**: PascalCase (ej: `CombustiblesETLv2`)
-- **Functions**: snake_case (ej: `get_productos`)
-- **Constants**: UPPER_SNAKE_CASE (ej: `DATABASE_URL`)
-- **Formateo**: Black (line length 100)
-- **Linting**: Flake8 + pylint
-- **Type hints**: Obligatorios en funciones públicas
+Arquitectura frontend real:
+- frontend/src/App.tsx
+- frontend/src/pages/
+- frontend/src/components/
+- frontend/src/services/
 
-### Git Commits
-Formato: `<type>: <description>`
+Plan de producto y prioridades:
+- ROADMAP.md
 
-**Types**:
-- `feat`: Nueva funcionalidad
-- `fix`: Bug fix
-- `docs`: Documentación
-- `style`: Formato (sin cambios de código)
-- `refactor`: Refactorización
-- `test`: Tests
-- `chore`: Mantenimiento
+Documentación general:
+- README.md
+- DEPLOYMENT.md
+- QUICKSTART.md
 
-**Ejemplos**:
-```bash
-git commit -m "feat: agregar página de contacto con Formspree"
-git commit -m "fix: corregir parsing de CSV en combustibles ETL"
-git commit -m "docs: actualizar README con nuevas páginas"
-```
+Documentos que requieren validación contra código antes de usarse:
+- ARCH-002_COMPLETION_REPORT.txt
+- documentos en docs/ relacionados con migraciones o integración futura
 
-## 🌐 APIs y Endpoints
+## Estructura real del repo
 
-### Backend API (http://localhost:8000)
-- `GET /api/v1/productos` - Listar todos los productos
-- `GET /api/v1/productos?categoria=electricidad` - Filtrar por categoría
-- `GET /api/v1/precios/{id}/ultimo` - Último precio de un producto
-- `GET /api/v1/precios/{id}/variacion?dias=30` - Variación de precio
-- `GET /docs` - Documentación OpenAPI (Swagger)
+Root:
+- frontend/: app React + Vite + TypeScript
+- backend/: app FastAPI + SQLAlchemy + APScheduler + tests
+- docs/: documentos de soporte, estrategia y notas históricas
+- .github/: workflows, seguridad, contexto compartido e instrucciones para agentes
 
-### Frontend Dev Server (http://localhost:5173)
-- `/` - Home
-- `/servicios` - UTE, OSE, Antel
-- `/comparador` - Comparar productos
-- `/producto/:id` - Detalle de producto
-- `/sobre-nosotros` - Sobre Nosotros
-- `/contacto` - Formulario de contacto
+Backend:
+- backend/app/main.py: arranque FastAPI, lifespan, scheduler, middlewares
+- backend/app/routers/precios.py: endpoints de productos, precios, variaciones, comparar, estadísticas
+- backend/app/routers/etl.py: ejecución manual de ETLs y status del scheduler
+- backend/app/routers/facturas.py: endpoints del analizador de facturas
+- backend/app/etl/combustibles.py: ETL CKAN de combustibles
+- backend/app/etl/utilities.py: ETL de utilities con fallback/manual history
+- backend/app/etl/indices.py: ETL de IPC y dólar BCU
+- backend/app/services/scheduler.py: jobs programados y alertas operativas
+- backend/app/models/models.py: modelos Producto y Precio
+- backend/tests/: suite de pytest
 
-## 🔐 Variables de Entorno
+Frontend:
+- frontend/src/pages/Home.tsx
+- frontend/src/pages/Servicios.tsx
+- frontend/src/pages/Comparador.tsx
+- frontend/src/pages/MiFactura.tsx
+- frontend/src/pages/ProductoDetalle.tsx
+- frontend/src/pages/PrecioNaftaHoy.tsx
+- frontend/src/pages/About.tsx
+- frontend/src/pages/Contacto.tsx
+- frontend/src/pages/SobreNosotros.tsx
+- frontend/src/pages/GastoPublico.tsx
+- frontend/src/components/PriceCard.tsx
 
-### Backend (`backend/.env`)
-```env
-DATABASE_URL=sqlite:///./preciosregulados.db  # o PostgreSQL en producción
-DEBUG=True
-PROJECT_NAME=PreciosRegulados.uy
-CORS_ORIGINS=http://localhost:3000,http://localhost:5173
-```
+## Stack real
 
-### Frontend (`frontend/.env.local`)
-```env
-VITE_API_URL=http://localhost:8000
-VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Google Analytics
-```
+Frontend:
+- React 18
+- TypeScript
+- Vite
+- Tailwind CSS
+- TanStack Query
+- Recharts
 
-## 📊 Feature Flags (ARCH-002)
+Backend:
+- Python 3.11+
+- FastAPI
+- SQLAlchemy
+- Pydantic Settings
+- APScheduler
+- pandas
+- requests
+- pytest
 
-Sistema de rollout gradual implementado para ETL v2:
-- **DISABLED**: Funcionalidad desactivada
-- **SHADOW**: Ejecuta v1 y v2, retorna v1, loggea v2
-- **CANARY**: 10% tráfico a v2
-- **GRADUAL**: 25-50% tráfico a v2
-- **FULL**: 100% tráfico a v2
+Persistencia:
+- SQLite en desarrollo por defecto
+- PostgreSQL en producción según configuración
 
-**Estado actual**: CANARY 10% para combustibles, UTE, OSE, Antel
+Infraestructura:
+- Frontend desplegable en Cloudflare Pages
+- Backend con configuración compatible con Render/Railway
+- Docker Compose para entorno local full stack
 
-## 🧪 Testing
+## ETLs implementados hoy
 
-### Backend
-```bash
-cd backend
-pytest                    # Todos los tests
-pytest -v                 # Verbose
-pytest tests/test_api.py  # Tests específicos
-pytest --cov              # Con coverage
-```
+### Combustibles
+Archivo:
+- backend/app/etl/combustibles.py
 
-### Frontend
-```bash
-cd frontend
-npm test                  # Run tests
-npm run test:coverage     # Con coverage
-```
+Fuente:
+- CKAN catalogodatos.gub.uy
 
-## 📦 Dependencias Principales
+Características:
+- extracción paginada
+- transformación a serie histórica
+- inserción incremental evitando duplicados
+- scheduler activo
+- cobertura de tests dedicada
 
-### Frontend
-```json
-{
-  "react": "^18.x",
-  "react-router-dom": "^6.x",
-  "@tanstack/react-query": "^5.x",
-  "lucide-react": "^0.x",
-  "tailwindcss": "^3.x"
-}
-```
+### Utilities
+Archivo:
+- backend/app/etl/utilities.py
 
-### Backend
-```python
-fastapi==0.104.1
-sqlalchemy==2.0.23
-pydantic==2.5.0
-uvicorn[standard]==0.24.0
-pytest==7.4.3
-```
+Fuentes:
+- mezcla de scraping/parsing y TARIFF_HISTORY manual
 
-## 🚀 Comandos Útiles
+Estado:
+- funcional pero no plenamente automatizado
+- principal riesgo de desactualización silenciosa
+- UTE/OSE priorizan parseo de PDF local de URSEA cuando hay datos mapeables
+- fallback a TARIFF_HISTORY cuando no hay PDF usable
 
-### Desarrollo Local
-```bash
-# Backend
-cd backend
-source ../.venv/bin/activate
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+### Índices
+Archivo:
+- backend/app/etl/indices.py
 
-# Frontend
-cd frontend
-npm run dev -- --host --port 5173
+Fuentes:
+- IPC desde CKAN con URL de recurso oficial configurada
+- dólar BCU desde la página oficial de cotizaciones del BCU
 
-# Base de datos
-python scripts/init_db.py
-python scripts/load_historical.py
-python scripts/check_db.py
-```
+Estado:
+- implementado
+- integrado en router ETL
+- integrado en scheduler
+- con tests unitarios nuevos
 
-### Producción
-```bash
-# Build frontend
-cd frontend
-npm run build
+### Gasto Público
+Archivo:
+- backend/app/etl/gasto_publico.py
 
-# Deploy backend
-cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
-```
+Fuente:
+- CKAN MEF CSV (ejecución presupuestal por inciso)
+- URL configurada en settings.CKAN_MEF_EJECUCION_URL
 
-## 🎨 Design System
+Modelo:
+- EjecucionPresupuestal (tabla separada de Producto/Precio)
+- Campos: anio, mes, inciso, nombre_organismo, credito_vigente, ejecutado, fuente
+- hybrid_property: porcentaje_ejecucion
 
-### Colores (TailwindCSS)
-- **Primary**: Blue-600 (`#2563eb`)
-- **Secondary**: Purple-600 (`#9333ea`)
-- **Success**: Green-600 (`#16a34a`)
-- **Error**: Red-600 (`#dc2626`)
-- **Warning**: Yellow-600 (`#ca8a04`)
-
-### Tipografía
-- **Font Family**: System font stack (Inter, sans-serif)
-- **Tamaños**: text-sm, text-base, text-lg, text-xl, text-2xl, text-3xl, text-4xl, text-5xl
-
-### Espaciado
-- **Gap**: 2, 4, 6, 8, 12, 16 (en múltiplos de 4px)
-- **Padding**: p-4, p-6, p-8
-- **Margin**: m-4, m-6, m-8
-
-## 📧 Integraciones Externas
-
-### Formspree (Formulario de Contacto)
-- **Endpoint**: https://formspree.io/f/xaqoleyk
-- **Plan**: Free (50 mensajes/mes)
-- **Dashboard**: https://formspree.io/forms/xaqoleyk
-
-### Google Analytics
-- **ID**: G-XXXXXXXXXX (reemplazar con ID real)
-- **Script**: Integrado en `frontend/index.html`
-- **Dashboard**: https://analytics.google.com/
-
-## 🔗 Links Importantes
-
-- **Repositorio**: https://github.com/manusabbath-arch/cuantocuestauruguay
-- **Sitio Web**: https://cuantocuestauruguay.com
-- **Catálogo de Datos**: https://catalogodatos.gub.uy
-- **API Docs (local)**: http://localhost:8000/docs
-
-## 📝 Roadmap
-
-### Completado ✅
-- [x] ARCH-002: Migración ETL con feature flags
-- [x] FUNC-001: ETL Servicios Públicos (UTE, OSE, Antel)
-- [x] Página de Contacto con Formspree
-- [x] Página Sobre Nosotros
-- [x] Google Analytics integrado
-
-### En Progreso 🚧
-- [ ] ARCH-002 FASE 1: Monitoreo canary 10% (7 días)
-- [ ] Testing end-to-end completo
-
-### Próximos ⏭️
-- [ ] FUNC-002: Sistema de alertas (email con Resend)
-- [ ] PERF-001: Optimizaciones frontend (code splitting, PWA)
-- [ ] Gráficos históricos con Chart.js
-- [ ] API pública documentada
-
-## 💡 Patrones de Uso Comunes
-
-### Crear una nueva página
-1. Crear componente en `frontend/src/pages/MiPagina.tsx`
-2. Agregar ruta en `frontend/src/App.tsx`
-3. Agregar link en `frontend/src/components/Layout.tsx`
-
-### Agregar un nuevo endpoint
-1. Crear función en `backend/app/api/v1/endpoints/mi_endpoint.py`
-2. Agregar schema en `backend/app/schemas/mi_schema.py`
-3. Registrar router en `backend/app/api/v1/api.py`
-
-### Crear un nuevo ETL
-1. Crear clase en `backend/app/etl/mi_etl_v2.py` heredando de `ETLBase`
-2. Implementar métodos: `extract()`, `transform()`, `load()`
-3. Agregar PRODUCTOS_MAP y TARIFF_HISTORY
-4. Registrar en scheduler
-
-## 🐛 Debugging Tips
-
-### Frontend
-```bash
-# Ver logs en navegador
-# Abrir DevTools > Console
-
-# React Query DevTools
-# Ya integrado, ver panel en desarrollo
-```
-
-### Backend
-```bash
-# Logs detallados
-uvicorn app.main:app --log-level debug
-
-# Ver queries SQL
-# En database.py, agregar: echo=True a create_engine()
-
-# Verificar base de datos
-python scripts/check_db.py
-```
-
-## 🤝 Contribución
-
-Ver [CONTRIBUTING.md](CONTRIBUTING.md) para guía completa de contribución.
-
-### Quick Start para Contribuir
-1. Fork el repositorio
-2. Crear rama: `git checkout -b feature/mi-feature`
-3. Hacer cambios y commits: `git commit -m "feat: mi nueva funcionalidad"`
-4. Push: `git push origin feature/mi-feature`
-5. Crear Pull Request en GitHub
+Estado:
+- ETL implementado con detección dinámica de columnas y limpieza numérica
+- Router gasto.py con 3 endpoints (organismos, ejecución, comparación YoY)
+- Scheduler mensual activo (día 1 a las 03:30 UTC)
+- Frontend pendiente (GastoPublico.tsx no existe)
 
 ---
 
-**Última actualización**: 27 de enero de 2026
-**Versión**: 1.1.0
-**Estado**: En desarrollo activo
+## Scheduler real
+
+Archivo:
+- backend/app/services/scheduler.py
+
+Jobs:
+- combustibles: lote diario
+- utilities: lote semanal (día configurable) desplazado respecto a combustibles
+- índices: lote diario desplazado respecto a utilities
+- gasto público: lote mensual (día 1 a las 03:30 UTC)
+
+Notas:
+- el scheduler dispara alertas por excepción, tiempos largos, cargas parciales y cero registros
+- la lógica real del schedule debe verificarse siempre en scheduler.py, no en documentos viejos
+
+## Modelos de datos actuales
+
+Producto:
+- nombre único
+- categoría
+- unidad
+- activo
+
+Precio:
+- producto_id
+- fecha
+- valor
+- fuente
+- unique constraint por producto_id + fecha
+
+Categorías usadas/esperadas:
+- combustible
+- indice
+- utilities puede convivir con nombres de categoría históricos según datos ya cargados
+
+## Endpoints relevantes
+
+Precios:
+- GET /api/v1/productos
+- GET /api/v1/productos/{producto_id}
+- GET /api/v1/precios/{producto_id}
+- GET /api/v1/precios/{producto_id}/ultimo
+- GET /api/v1/variacion/{producto_id}
+- GET /api/v1/comparar
+- GET /api/v1/estadisticas/{producto_id}
+
+ETL:
+- POST /api/v1/etl/run
+- POST /api/v1/etl/utilities/run
+- POST /api/v1/etl/indices/run
+- POST /api/v1/etl/gasto/run
+- POST /api/v1/etl/gasto/opp/run
+- POST /api/v1/etl/run-all
+- GET /api/v1/etl/status
+- GET /api/v1/etl/alerts
+
+Gasto público:
+- GET /api/v1/gasto/organismos
+- GET /api/v1/gasto/ejecucion
+- GET /api/v1/gasto/comparacion-anual
+
+App:
+- GET /
+- GET /health
+- GET /metrics
+
+## Comandos útiles verificados
+
+Backend local:
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Frontend local:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Tests backend:
+```bash
+cd backend
+venv/bin/python -m pytest tests/
+venv/bin/python -m pytest tests/test_combustibles_etl.py
+venv/bin/python -m pytest tests/test_indices_etl.py
+```
+
+Stack completo con Docker:
+```bash
+docker-compose up -d
+```
+
+Migraciones:
+```bash
+cd backend
+alembic upgrade head
+```
+
+## Forma recomendada de colaboración entre agentes
+
+Antes de tocar código:
+- leer este archivo
+- leer ROADMAP.md si el cambio afecta prioridades o producto
+- validar el comportamiento real en código, no en docs históricas
+
+Si un agente implementa algo estructural:
+- actualizar este archivo si cambió una fuente, flujo ETL, comando, endpoint o estado del proyecto
+- no copiar el mismo contexto en varios archivos
+
+Si hay contradicción entre docs:
+- preferir código
+- anotar la contradicción en este archivo o limpiar la doc vieja
+
+## Convenciones para evitar duplicación de esfuerzo
+
+- Mantener este archivo corto, factual y orientado a ejecución
+- No registrar worklogs temporales aquí
+- No usar este archivo para brainstorming o ideas de marketing
+- Usar ROADMAP.md para prioridades y fases
+- Usar docs/ para análisis largos o documentos específicos de tema
+
+## Riesgos y caveats actuales
+
+- Utilities todavía depende de historia manual
+- Parte de la documentación del repo sobre ARCH-002 no describe el estado real del código
+- README.md necesita cautela porque mezcla visión futura con implementación actual
+- El tipo de cambio BCU hoy no depende de un dataset CKAN confirmado sino de la tabla oficial del BCU
+
+## Cuándo actualizar este archivo
+
+Actualizar si cambia cualquiera de estos puntos:
+- ETLs implementados
+- fuentes oficiales
+- scheduler/jobs
+- endpoints públicos
+- estructura real del repo
+- comandos recomendados de desarrollo/test
+- advertencias importantes sobre docs desalineadas

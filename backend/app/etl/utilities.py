@@ -16,6 +16,7 @@ Extraction methods:
 import io
 import logging
 from datetime import date, datetime
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import pandas as pd
@@ -24,7 +25,13 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.etl.pdf_parser import list_pdfs_in_directory, parse_ose_tariff_pdf, parse_ute_tariff_pdf
+from app.etl.alerts import alert_manager
+from app.etl.pdf_parser import (
+    discover_and_download_latest_pdf,
+    list_pdfs_in_directory,
+    parse_ose_tariff_pdf,
+    parse_ute_tariff_pdf,
+)
 from app.models.models import Precio, Producto
 
 logger = logging.getLogger(__name__)
@@ -105,6 +112,57 @@ class UtilitiesETL:
     def __init__(self, db: Session):
         self.db = db
 
+    @staticmethod
+    def _pdf_dir(service: str) -> str:
+        base_dir = Path(__file__).resolve().parents[2]
+        return str(base_dir / "pdfs" / service)
+
+    @staticmethod
+    def _map_ute_nombre_to_producto(nombre: str) -> Optional[str]:
+        """Mapea etiquetas de tablas tarifarias de UTE a claves de producto internas."""
+        normalized = (nombre or "").lower()
+
+        if "bt1" in normalized:
+            return "UTE_RESIDENCIAL_BT1"
+        if "bt2" in normalized:
+            return "UTE_RESIDENCIAL_BT2"
+        if "bt3" in normalized or "general" in normalized:
+            return "UTE_GENERAL_BT3"
+        if "industrial" in normalized:
+            return "UTE_INDUSTRIAL"
+
+        return None
+
+    def _normalize_ute_pdf_records(self, records: List[Dict], pdf_path: str) -> pd.DataFrame:
+        """Normaliza registros de parser UTE para cumplir el esquema esperado por `load()`."""
+        today = date.today()
+        mapped_records: Dict[str, Dict] = {}
+
+        for record in records:
+            producto_key = self._map_ute_nombre_to_producto(str(record.get("nombre", "")))
+            if not producto_key:
+                continue
+
+            valor_str = record.get("valor_str")
+            if valor_str is None:
+                valor_str = record.get("valor")
+
+            if valor_str is None:
+                continue
+
+            # Conserva el primer valor parseado por producto para evitar duplicados por tabla/página.
+            mapped_records.setdefault(
+                producto_key,
+                {
+                    "producto": producto_key,
+                    "fecha": today,
+                    "valor_str": str(valor_str),
+                    "fuente": f"URSEA PDF - {pdf_path}",
+                },
+            )
+
+        return pd.DataFrame(mapped_records.values())
+
     async def extract_ute_tarifas(self) -> Optional[pd.DataFrame]:
         """
         Extrae tarifas de UTE desde múltiples fuentes en orden de prioridad:
@@ -119,19 +177,38 @@ class UtilitiesETL:
         try:
             logger.info("Extracting UTE tarifas")
 
-            # Intenta parsear PDF local primero
-            pdf_dir = "backend/pdfs/ute"
+            # Descubre y descarga PDF reciente de URSEA antes de parsear locales.
+            downloaded_pdf = discover_and_download_latest_pdf(
+                page_url=self.URSEA_UTE_URL,
+                destination_dir=self._pdf_dir("ute"),
+                filename_prefix="ute_tarifas_latest",
+                preferred_keywords=["ute", "electrica", "distribuidora", "pliego tarifario"],
+            )
+
+            pdf_dir = self._pdf_dir("ute")
             pdfs = list_pdfs_in_directory(pdf_dir)
+            if downloaded_pdf and downloaded_pdf not in pdfs:
+                pdfs.insert(0, downloaded_pdf)
+
             if pdfs:
                 logger.info(f"Found {len(pdfs)} UTE PDF(s), attempting parse...")
                 for pdf_path in pdfs:
                     try:
                         records = parse_ute_tariff_pdf(pdf_path)
                         if records:
-                            logger.info(f"Successfully parsed {len(records)} records from {pdf_path}")
-                            df = pd.DataFrame(records)
-                            df["fecha"] = date.today()
-                            return df
+                            logger.info(f"Successfully parsed {len(records)} raw records from {pdf_path}")
+                            df = self._normalize_ute_pdf_records(records, pdf_path)
+                            if not df.empty:
+                                logger.info(f"Mapped {len(df)} UTE records from {pdf_path}")
+                                return df
+                            logger.warning(f"Parsed UTE PDF without mappable tariff rows: {pdf_path}")
+                            alert_manager.send_alert(
+                                alert_type="utilities_pdf_unmapped",
+                                etl_name="Utilities-UTE",
+                                message="Parsed UTE PDF without mappable tariff rows; falling back to history",
+                                context={"pdf_path": pdf_path, "records_extracted": len(records)},
+                                severity="warning",
+                            )
                     except Exception as e:
                         logger.warning(f"Failed to parse {pdf_path}: {e}")
 
@@ -172,22 +249,42 @@ class UtilitiesETL:
         try:
             logger.info("Extracting OSE tarifas from PDF or verified history")
 
+            downloaded_pdf = discover_and_download_latest_pdf(
+                page_url=self.URSEA_OSE_URL,
+                destination_dir=self._pdf_dir("ose"),
+                filename_prefix="ose_tarifas_latest",
+                preferred_keywords=["ose", "agua", "saneamiento", "regimen tarifario"],
+            )
+
             # Intentar parsear PDF local primero
-            pdf_dir = "backend/pdfs/ose"
+            pdf_dir = self._pdf_dir("ose")
             pdfs = list_pdfs_in_directory(pdf_dir)
+            if downloaded_pdf and downloaded_pdf not in pdfs:
+                pdfs.insert(0, downloaded_pdf)
 
             if pdfs:
                 logger.info(f"Found {len(pdfs)} OSE PDF(s), attempting parse...")
+                parsed_any = False
                 for pdf_path in pdfs:
                     try:
                         records = parse_ose_tariff_pdf(pdf_path)
                         if records:
+                            parsed_any = True
                             logger.info(f"Successfully parsed {len(records)} records from {pdf_path}")
                             df = pd.DataFrame(records)
                             df["fecha"] = date.today()
                             return df
                     except Exception as e:
                         logger.warning(f"Failed to parse {pdf_path}: {e}")
+
+                if not parsed_any:
+                    alert_manager.send_alert(
+                        alert_type="utilities_pdf_unmapped",
+                        etl_name="Utilities-OSE",
+                        message="No usable rows parsed from OSE PDFs; falling back to history",
+                        context={"pdf_count": len(pdfs)},
+                        severity="warning",
+                    )
 
             today = date.today()
             data = []

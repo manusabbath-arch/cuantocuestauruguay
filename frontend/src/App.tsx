@@ -11,6 +11,7 @@ import { useEffect } from 'react'
 import { trackPageview } from './lib/analytics'
 import PrecioNaftaHoy from './pages/PrecioNaftaHoy'
 import MiFactura from './pages/MiFactura'
+import GastoPublico from './pages/GastoPublico'
 
 function App() {
   const location = useLocation()
@@ -31,6 +32,7 @@ function App() {
         <Route path="/contacto" element={<Contacto />} />
         <Route path="/precio-nafta-hoy" element={<PrecioNaftaHoy />} />
         <Route path="/mi-factura" element={<MiFactura />} />
+        <Route path="/gasto-publico" element={<GastoPublico />} />
       </Routes>
     </Layout>
   )
